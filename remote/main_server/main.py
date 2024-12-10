@@ -1,13 +1,25 @@
+import os
+import speech_recognition as sr
+import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import pickle
+from tensorflow.keras import backend as K
+from konlpy.tag import Kkma
+import re
 import cv2
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from db import *
+import tensorflow as tf
+import threading
 
 app = Flask(__name__)
-CORS(app, resources={r"/*":{"origins":"http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
-# cap = cv2.VideoCapture(2)  # 비디오 파일 경로
 cap = None
+
+global target
 
 def initialize_camera():
     global cap
@@ -17,18 +29,16 @@ def generate_frames():
     global cap
     if cap is None:
         initialize_camera()
-        
+
     while True:
         success, frame = cap.read()
         if not success:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 처음부터 다시 시작
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             continue
 
-        # 프레임을 JPEG 형식으로 인코딩
         _, buffer = cv2.imencode('.jpg', frame)
         frame_data = buffer.tobytes()
 
-        # 클라이언트로 프레임 전송
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
 
@@ -39,12 +49,11 @@ def video_feed():
 
 @app.route('/select_data', methods=['POST'])
 def get_data():
-    criteria = request.json  # JSON 형식으로 조건을 받음
-    start_date = criteria.get('startDate')  # 시작 날짜
-    end_date = criteria.get('endDate')      # 종료 날짜
-    search_value = criteria.get('searchValue')  # 검색 값
+    criteria = request.json
+    start_date = criteria.get('startDate')
+    end_date = criteria.get('endDate')
+    search_value = criteria.get('searchValue')
 
-    # 기본 쿼리
     query = """
     SELECT 
         taxi.taxi_id AS taxi_id,
@@ -64,12 +73,11 @@ def get_data():
         users ON taxi_operation.user_id = users.user_id
     """
 
-    # 조건이 없을 경우, 모든 데이터를 조회
     params = []
     if not start_date and not end_date and not search_value:
-        query += ""  # WHERE 절 없이 모든 데이터 조회
+        query += ""
     else:
-        query += "WHERE 1=1 "  # 기본 조건 추가
+        query += "WHERE 1=1 "
         if start_date and end_date:
             query += "AND taxi_operation.start_time BETWEEN %s AND %s "
             params += [start_date, end_date]
@@ -77,17 +85,15 @@ def get_data():
             query += "AND (taxi.taxi_id LIKE %s OR users.username LIKE %s OR users.phone_number LIKE %s) "
             params += [f"%{search_value}%", f"%{search_value}%", f"%{search_value}%"]
 
-    # execute_query 함수를 사용하여 데이터 조회
     raw_data = execute_query(query, params)
 
-    # 응답을 JSON 형식으로 변환
     data = [
         {
             "taxi_id": row[0],
             "username": row[1],
             "phone_number": row[2],
-            "start_time": row[3].isoformat(),  # ISO 포맷으로 변환
-            "end_time": row[4].isoformat(),    # ISO 포맷으로 변환
+            "start_time": row[3].isoformat(),
+            "end_time": row[4].isoformat(),
             "distance": row[5],
             "charge": row[6],
             "start_location": row[7],
@@ -105,13 +111,12 @@ def get_revenue():
     start_date = criteria.get('startDate')
     end_date = criteria.get('endDate')
 
-    # 기본 쿼리
     query = """
     SELECT SUM(taxi_operation.charge) AS total_revenue
     FROM taxi_operation
     WHERE 1=1
     """
-    
+
     params = []
     if taxi_id:
         query += " AND taxi_operation.taxi_id = %s"
@@ -122,10 +127,8 @@ def get_revenue():
         params.append(start_date)
         params.append(end_date)
 
-    # execute_query 함수를 사용하여 데이터 조회
     total_revenue = execute_query(query, params)
 
-    # 결과를 JSON 형식으로 변환
     result = {
         "taxi_id": taxi_id if taxi_id else "All",
         "total_revenue": total_revenue[0][0] if total_revenue else 0
@@ -138,7 +141,6 @@ def get_taxi_list():
     query = "SELECT taxi_id, taxi_type FROM taxi"
     raw_data = execute_query(query)
 
-    # 응답을 JSON 형식으로 변환
     data = [
         {
             "taxi_id": row[0],
@@ -156,7 +158,6 @@ def get_user_revenue():
     start_date = criteria.get('startDate')
     end_date = criteria.get('endDate')
 
-    # 기본 쿼리
     query = """
     SELECT SUM(charge) AS total_revenue
     FROM taxi_operation
@@ -169,10 +170,8 @@ def get_user_revenue():
         query += " AND start_time BETWEEN %s AND %s"
         params += [start_date, end_date]
 
-    # execute_query 함수를 사용하여 데이터 조회
     total_revenue = execute_query(query, params)
 
-    # 결과를 JSON 형식으로 변환
     result = {
         "user_id": user_id,
         "total_revenue": total_revenue[0][0] if total_revenue else 0
@@ -185,7 +184,6 @@ def get_users():
     query = "SELECT user_id, username FROM users"
     raw_data = execute_query(query)
 
-    # 응답을 JSON 형식으로 변환
     data = [
         {
             "user_id": row[0],
@@ -196,6 +194,115 @@ def get_users():
 
     return jsonify(data)
 
+@app.route('/get_target', methods=['GET'])
+def get_target():
+    global target
+    return target
+
+MODEL_PATH = "./speech_intent_model.h5"
+TOKENIZER_PATH = "./tokenizer.pkl"
+LABEL_DICT = {0: "로보 호출", 1: "목적지 지정", 2: "하차", 3: "의미 없음"}
+MAX_LEN = 30
+
+def focal_loss(gamma=2., alpha=0.25):
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        pt = tf.where(K.equal(y_true, 1), y_pred, 1 - y_pred)
+        return -K.sum(alpha * K.pow(1. - pt, gamma) * K.log(pt))
+    return focal_loss_fixed
+
+model = load_model(MODEL_PATH, custom_objects={"focal_loss_fixed": focal_loss()})
+
+with open(TOKENIZER_PATH, "rb") as f:
+    tokenizer = pickle.load(f)
+
+recognizer = sr.Recognizer()
+
+kkma = Kkma()
+
+def extract_subject(text):
+    morphs = kkma.pos(text)
+    subject = []
+    current_noun = ''
+
+    for word, pos in morphs:
+        if pos in ['NNG', 'NNP']:
+            current_noun += word
+        else:
+            if current_noun:
+                subject.append(current_noun)
+                current_noun = ''
+
+    if current_noun:
+        subject.append(current_noun)
+
+    address_pattern = re.compile(r'([가-힣]+)\s?(\d{1,5}-\d{1,5})')
+    address_matches = address_pattern.findall(text)
+    for match in address_matches:
+        subject.append(match[0] + " " + match[1])
+
+    return subject
+
+def predict_with_temperature_adjustment(text, threshold=0.6, gap_threshold=0.3, temperature=1.2):
+    sequence = tokenizer.texts_to_sequences([text])
+    padded_sequence = pad_sequences(sequence, maxlen=MAX_LEN, padding="post")
+
+    logits = model.predict(padded_sequence) / temperature
+    confidence = np.max(logits)
+    predicted_label = np.argmax(logits)
+    second_highest = np.partition(logits.flatten(), -2)[-2]
+    confidence_gap = confidence - second_highest
+
+    label_scores = {LABEL_DICT[i]: logits[0][i] for i in range(len(LABEL_DICT))}
+
+    if confidence < threshold or confidence_gap < gap_threshold:
+        result = f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f})\n"
+        result += "라벨별 점수:"
+        result += " ".join([f"{label}: {score:.2f}" for label, score in label_scores.items()])
+        return result, None
+
+    result = f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f})\n"
+    result += "라벨별 점수:"
+    result +=  " ".join([f"{label}: {score:.2f}" for label, score in label_scores.items()])
+
+    if predicted_label in [1, 2] and confidence >= threshold:
+        subject = extract_subject(text)
+        result += f"\n추출된 주어: {subject}"
+        return result, subject
+
+    return result, None
+
+def voice_to_intent():
+    global target
+    with sr.Microphone() as source:
+        print("말씀하세요 (Ctrl+C로 종료):")
+        try:
+            recognizer.adjust_for_ambient_noise(source, duration=1)
+            recognizer.energy_threshold = 2000
+            print("음성을 기다리는 중...")
+            audio = recognizer.listen(source)
+            print("음성을 처리 중입니다...")
+            text = recognizer.recognize_google(audio, language="ko-KR")
+            print(f"인식된 텍스트: {text}")
+
+            intent_details, subject = predict_with_temperature_adjustment(text)
+
+            if subject:
+                print(f"주어 추출 결과: {subject}")
+                target = subject
+        except sr.UnknownValueError:
+            print("음성을 인식할 수 없습니다.")
+        except sr.RequestError as e:
+            print(f"Google Speech Recognition 서비스에 접근할 수 없습니다: {e}")
+
+def run_voice_recognition():
+    while True:
+        voice_to_intent()
+
+def run_flask_server():
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    threading.Thread(target=run_voice_recognition, daemon=True).start()
+    run_flask_server()
