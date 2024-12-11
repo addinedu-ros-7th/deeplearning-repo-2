@@ -9,6 +9,7 @@ import TaxiList from './components/TaxiList';
 import PieChart from './components/PieChart';
 import UserMoney from './components/UserMoney';
 import KakaoMap from './components/KakaoMap';
+import Driving from './components/Driving';
 
 const Container = styled.div`
     display: flex;
@@ -76,7 +77,8 @@ const App = () => {
                       <Routes>
                           <Route path='manager/taxi/list' element={<TaxiList taxis={taxis} />} />
                           <Route path='user/video' element={<LiveVideo />} />
-                          <Route path='user/driving' element={<KakaoMap />} />
+                          {/* <Route path='user/driving' element={<KakaoMap />} /> */}
+                          <Route path='user/driving' element={<Driving />} />
                           <Route path='manager/taxi/chart' element={<PieChart />} />
                           <Route path='user/money' element={<UserMoney />} />
                       </Routes>

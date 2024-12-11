@@ -9,13 +9,16 @@ from konlpy.tag import Kkma
 import re
 import cv2
 from flask import Flask, Response, jsonify, request
+from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from db import *
 import tensorflow as tf
 import threading
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+# CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
+socketio = SocketIO(app,cors_allowed_origins="*")
 
 cap = None
 
@@ -23,8 +26,10 @@ global target
 
 def initialize_camera():
     global cap
+    global target
     cap = cv2.VideoCapture(2)
-
+    target = None
+    
 def generate_frames():
     global cap
     if cap is None:
@@ -197,10 +202,10 @@ def get_users():
 @app.route('/get_target', methods=['GET'])
 def get_target():
     global target
-    return target
+    return str(target)
 
-MODEL_PATH = "./speech_intent_model.h5"
-TOKENIZER_PATH = "./tokenizer.pkl"
+MODEL_PATH = "./data/speech_intent_model.h5"
+TOKENIZER_PATH = "./data/tokenizer.pkl"
 LABEL_DICT = {0: "로보 호출", 1: "목적지 지정", 2: "하차", 3: "의미 없음"}
 MAX_LEN = 30
 
@@ -291,6 +296,7 @@ def voice_to_intent():
             if subject:
                 print(f"주어 추출 결과: {subject}")
                 target = subject
+                socketio.emit('target_updated', {'target': target})
         except sr.UnknownValueError:
             print("음성을 인식할 수 없습니다.")
         except sr.RequestError as e:
@@ -301,7 +307,8 @@ def run_voice_recognition():
         voice_to_intent()
 
 def run_flask_server():
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
 
 if __name__ == '__main__':
     threading.Thread(target=run_voice_recognition, daemon=True).start()
