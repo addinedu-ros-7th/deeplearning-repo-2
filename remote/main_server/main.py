@@ -234,6 +234,20 @@ def get_target():
     global target
     return str(target)
 
+# 주어 추출 함수
+def extract_subject(text):
+    try:
+        morphs = kkma.pos(text)
+        subject = []
+        for word, pos in morphs:
+            if pos in ['NNG', 'NNP', 'SN', 'NNB']:
+                subject.append(word)
+            else:
+                if subject:
+                    break
+        return "".join(subject) if subject else None
+    except Exception as e:
+        return f"주어 추출 중 오류: {e}"
 
 # 온도 조정된 예측 함수
 def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
@@ -248,61 +262,51 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
         second_highest = sorted(logits.flatten())[-2]
         confidence_gap = confidence - second_highest
 
+        label_scores = ", ".join([f"{LABEL_DICT[i]}: {logits[0][i]:.2f}" for i in range(len(LABEL_DICT))])
+
         if confidence < threshold or confidence_gap < gap_threshold:
-            return "의미 없음"
+            return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
 
-        result_label = LABEL_DICT.get(predicted_label, "알 수 없음")
+        result = f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}"
 
-        if predicted_label in [1, 2]:  # "목적지 지정" 또는 "하차"인 경우
+        if predicted_label in [1, 2] and confidence >= threshold:
             subject = extract_subject(text)
-            if subject:
-                target = subject  # 글로벌 변수 업데이트
-                print(f"추출된 주어(target): {target}")  # 주어를 콘솔에 출력
-                socketio.emit('target_updated', {'target': target})  # 클라이언트로 전송
-        return result_label
+            target = subject
+            socketio.emit('target_updated', {'target': target})
+            result += f", 추출된 주어: {subject}"
+
+        return result
 
     except Exception as e:
-        return f"오류 발생: {e}"
-
-# 주어 추출 함수
-def extract_subject(text):
-    morphs = kkma.pos(text)
-    subject = []
-    for word, pos in morphs:
-        if pos in ['NNG', 'NNP', 'SN', 'NNB']:
-            subject.append(word)
-        else:
-            if subject:
-                break
-    return "".join(subject) if subject else None
+        return f"예측 중 오류 발생: {e}"
 
 # 음성을 의도로 변환
 def voice_to_intent():
+    """실시간 음성 인식을 통해 텍스트를 의도로 변환"""
     with sr.Microphone() as source:
+        print("음성 인식 준비 중...")
         recognizer.adjust_for_ambient_noise(source, duration=1)
         recognizer.pause_threshold = 2.0
-        print("음성 인식 준비 완료")
+        print("준비 완료! 말씀하세요 (Ctrl+C로 종료)")
 
-        while True:
-            try:
-                print("음성을 기다리는 중...")
-                audio = recognizer.listen(source, timeout=None)
-                print("음성을 처리 중입니다...")
+        # while True:  # 지속적으로 음성을 처리하기 위해 반복
+        try:
+            print("음성을 기다리는 중...")
+            audio = recognizer.listen(source, timeout=None)
+            print("음성을 처리 중입니다...")
 
-                text = recognizer.recognize_google(audio, language="ko-KR")
-                print(f"인식된 텍스트: {text}")
+            text = recognizer.recognize_google(audio, language="ko-KR")
+            print(f"인식된 텍스트: {text}")
 
-                prediction = predict_with_temperature_adjustment(text)
-                print(f"예측 결과: {prediction}")
+            prediction = predict_with_temperature_adjustment(text)
+            print(f"예측 결과: {prediction}")
 
-            except sr.UnknownValueError:
-                print("음성을 인식할 수 없습니다.")
-            except KeyboardInterrupt:
-                print("음성 인식이 중단되었습니다.")
-                break
-            except Exception as e:
-                print(f"오류 발생: {e}")
-                break
+        except sr.UnknownValueError:
+            print("음성을 인식할 수 없습니다.")
+        except KeyboardInterrupt:
+            print("음성 인식이 중단되었습니다.")
+        except Exception as e:
+            print(f"예기치 못한 오류 발생: {e}")
 
 # Flask 및 음성 인식을 병렬로 실행
 def run_flask_server():
