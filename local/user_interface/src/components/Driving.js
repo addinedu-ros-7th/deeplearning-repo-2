@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
 import styled from 'styled-components';
 import KakaoMap from './KakaoMap'; // KakaoMap 컴포넌트 import
@@ -37,9 +37,11 @@ const Driving = () => {
   const [socket, setSocket] = useState(null);
   const [targetLat, setTargetLat] = useState(null);
   const [targetLon, setTargetLon] = useState(null);
-  const [route, setRoute] = useState([]); // 경로를 저장할 상태 추가
+  const [route, setRoute] = useState([]);
   const [kakaoLoaded, setKakaoLoaded] = useState(false);
+  const [isTargetChecked, setIsTargetChecked] = useState(false); // 목적지 확인 상태 추가
 
+  // Kakao Maps API 로드
   useEffect(() => {
     const loadKakaoMap = () => {
       const script = document.createElement('script');
@@ -47,7 +49,7 @@ const Driving = () => {
       script.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey=e8f1677269dd57608c41205f9e55842f&autoload=false";
 
       script.onload = () => {
-        setKakaoLoaded(true); // 로드 완료 시 상태 업데이트
+        setKakaoLoaded(true);
       };
 
       script.onerror = () => {
@@ -64,11 +66,21 @@ const Driving = () => {
     const newSocket = io('http://localhost:5000');
     setSocket(newSocket);
 
+    // 목적지 확인 이벤트 수신
+    newSocket.on('target_checked', (data) => {
+      console.log('목적지 확인:', data.target_checked);
+      setIsTargetChecked(true);
+      setTarget(data.target_checked);
+      dispatch({ type: 'UPDATE_TARGET', payload: data.target_checked });
+      getLatLongFromAddress(data.target_checked);
+    });
+
+    // 최종 목적지 업데이트 이벤트 수신
     newSocket.on('target_updated', async (data) => {
-      console.log('수신된 목적지:', data.target);
-      setTarget(data.target);
-      dispatch({ type: 'UPDATE_TARGET', payload: data.target });
-      await getLatLongFromAddress(data.target);
+      console.log('수신된 목적지:', data.target_updated);
+      setTarget(data.target_updated);
+      dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
+      await getLatLongFromAddress(data.target_updated);
     });
 
     return () => {
@@ -103,11 +115,12 @@ const Driving = () => {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          setStartLocation(await getAddressFromLatLong(latitude, longitude));
+          const address = await getAddressFromLatLong(latitude, longitude);
+          setStartLocation(address);
           setStartLat(latitude);
           setStartLon(longitude);
           console.log(`출발지 위도: ${latitude}, 경도: ${longitude}`);
-          dispatch({ type: 'UPDATE_START_LOCATION', payload: startLocation });
+          dispatch({ type: 'UPDATE_START_LOCATION', payload: address });
         },
         (error) => {
           console.error("위치 정보를 가져오는 중 오류 발생:", error);
@@ -137,7 +150,6 @@ const Driving = () => {
 
   const handleCallTaxi = () => {
     if (startLat && startLon && targetLat && targetLon) {
-      // Kakao Maps의 경로 요청
       const start = new window.kakao.maps.LatLng(startLat, startLon);
       const end = new window.kakao.maps.LatLng(targetLat, targetLon);
       const directionsService = new window.kakao.maps.services.Directions();
@@ -147,8 +159,8 @@ const Driving = () => {
         destination: end,
         callback: function (result, status) {
           if (status === window.kakao.maps.services.Status.OK) {
-            const routePath = result.routes[0].path; // 첫 번째 경로의 좌표
-            setRoute(routePath); // 경로를 상태에 저장
+            const routePath = result.routes[0].path;
+            setRoute(routePath);
           } else {
             console.error('경로를 가져오는 중 오류 발생:', status);
           }
@@ -163,6 +175,12 @@ const Driving = () => {
     getCurrentLocation();
   }, []);
 
+  useEffect(() => {
+    if (isTargetChecked) {
+      handleCallTaxi(); // 목적지가 확인되면 자동으로 경로 요청
+    }
+  }, [isTargetChecked]);
+
   return (
     <Container>
       <h1>Driving Component</h1>
@@ -176,65 +194,10 @@ const Driving = () => {
       <KakaoMap 
         startCoords={new window.kakao.maps.LatLng(startLat, startLon)} 
         targetCoords={new window.kakao.maps.LatLng(targetLat, targetLon)} 
-        route={route} // 경로를 KakaoMap에 전달
+        route={route} 
       />
     </Container>
   );
 };
 
 export default Driving;
-// const handleCallTaxi = () => {
-//   if (window.kakao.maps.services) {
-//     // console.error("Kakao Maps가 로드되지 않았습니다.");
-//     // return;
-
-
-//   if (startLat && startLon && targetLat && targetLon) {
-//     const start = new window.kakao.maps.LatLng(startLat, startLon);
-//     const end = new window.kakao.maps.LatLng(targetLat, targetLon);
-    
-//     const directionsService = new window.kakao.maps.services.Directions();
-//     directionsService.route({
-//       origin: start,
-//       destination: end,
-//       callback: function (result, status) {
-//         if (status === window.kakao.maps.services.Status.OK) {
-//           const routePath = result.routes[0].path; // 첫 번째 경로의 좌표
-//           console.log("경로 데이터:", routePath); // 경로 데이터 확인
-//           setRoute(routePath); // 경로를 상태에 저장
-//         } else {
-//           console.error('경로를 가져오는 중 오류 발생:', status);
-//         }
-//       },
-//     });
-//   } else {
-//     console.error("출발지 또는 목적지의 위도와 경도를 확인하세요.");
-//   }
-//   }
-
-// };
-
-// useEffect(() => {
-//   getCurrentLocation();
-// }, []);
-
-// return (
-//   <Container>
-//     <h1>Driving Component</h1>
-//     <TargetDisplay>
-//       {target ? `목적지: ${target}` : '목적지를 설정하세요.'}
-//     </TargetDisplay>
-//     <LocationDisplay>
-//       {startLocation ? `현재 위치: ${startLocation}` : '현재 위치를 가져오는 중입니다...'}
-//     </LocationDisplay>
-//     <Button onClick={handleCallTaxi}>호출하기</Button>
-//     <KakaoMap 
-//       startCoords={new window.kakao.maps.LatLng(startLat, startLon)} 
-//       targetCoords={new window.kakao.maps.LatLng(targetLat, targetLon)} 
-//       route={route} // 경로를 KakaoMap에 전달
-//     />
-//   </Container>
-// );
-// };
-
-// export default Driving;
