@@ -351,8 +351,6 @@ def emit_lat_long(address):
     else:
         print("주소를 찾을 수 없습니다.")
 
-
-
 @app.route('/random_taxi', methods=['GET'])
 def random_taxi():
     query = "SELECT taxi_id, taxi_type, taxi_license FROM taxi WHERE status = 0"
@@ -370,6 +368,53 @@ def random_taxi():
     }
     print(response)
     return jsonify(response)
+
+# 주어 추출 함수
+def extract_subject_des(text):
+    try:
+        # 1단계: 텍스트 정리 (불필요한 어미 제거)
+        text = re.sub(r"(가자|줘|으로|로|가)$", "", text).strip()
+
+        # 2단계: 숫자와 단위 연결 (띄어쓰기 처리)
+        text = re.sub(r"(\d+)\s+(번|층|호|출구)", r"\1\2", text)
+
+        # 3단계: 하이픈 연결 (숫자-숫자 형태 유지)
+        text = re.sub(r"(\d+)\s*-\s*(\d+)", r"\1-\2", text)
+
+        # 4단계: Hannanum 명사 추출
+        hannanum = Hannanum()
+        nouns = hannanum.nouns(text)
+
+        # 5단계: 숫자와 단위를 결합
+        combined_text = " ".join(nouns)
+        combined_text = re.sub(r"(\d+)(번|층|호|출구)", r"\1\2", combined_text)
+
+        # 6단계: 불필요한 단어 제거 (텍스트 끝에 남은 '으로', '로' 처리)
+        result = re.sub(r"(으로|로)$", "", combined_text.replace(" ", "")).strip()
+
+        return result if result else None
+    except Exception as e:
+        return f"주어 추출 중 오류: {e}"
+
+def extract_subject_hacha(text):
+    try:
+        # 1단계: 불필요한 어미 제거
+        text = re.sub(r"(내려줘|세워줘|멈춰|으로|로|가)$", "", text).strip()
+
+        # 2단계: Hannanum 명사 추출
+        hannanum = Hannanum()
+        nouns = hannanum.nouns(text)
+
+        # 3단계: 의미 있는 단어 결합
+        combined_text = " ".join(nouns)
+
+        # 4단계: 위치 관련 표현 정리 (띄어쓰기와 불필요한 단어 제거)
+        combined_text = re.sub(r"(앞|뒤|여기|저기|지금|바로|횡단보도|카페|길|사거리|코너)", r" \1", combined_text)
+        result = combined_text.replace(" ", "").strip()
+
+        return result if result else None
+    except Exception as e:
+        return f"하차 주어 추출 중 오류: {e}"
 
 # 주어 추출 함수
 def extract_subject(text):
@@ -392,7 +437,9 @@ def extract_subject(text):
     except Exception as e:
         return f"주어 추출 중 오류: {e}"
 
+# 호출 상태를 관리하는 변수
 is_robot_called = False
+# 온도 조정된 예측 함수
 def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
     global is_robot_called
     global target
@@ -415,21 +462,27 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
         # 로보 호출이 활성화된 상태에서만 나머지 판단
         if is_robot_called:
             if predicted_label == 1 and confidence >= threshold:
-                subject = extract_subject(text)
+                subject = extract_subject_des(text)
                 target = subject
                 check_des()
                 print("목적지가 맞나 확인합니다.")
                 return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
+            
             elif predicted_label == 4 and confidence >= threshold:
                 print("목적지를 새로 입력하세요")
                 retake_des()
+            
             elif predicted_label == 5 and confidence >= threshold:
                 print("목적지가 확정 되었습니다")
                 go_des()
                 socketio.emit('target_updated', {'target': target})
-                # emit_lat_long(target)
                 is_robot_called = False # 확정되면 상태 초기화 
-        
+            
+            elif predicted_label == 2 and confidence >= threshold:
+                subject2 = extract_subject_hacha(text)
+                target = subject2
+                is_robot_called = False # 하차한다고하면 상태 초기화
+            
             elif predicted_label == 3:
                 is_robot_called = False  # 의미 없음이라도 상태 초기화
                 return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
@@ -441,7 +494,6 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
         return f"예측 중 오류 발생: {e}"
 
 # 음성을 의도로 변환
-
 def voice_to_intent():
     """실시간 음성 인식을 통해 텍스트를 의도로 변환"""
     with sr.Microphone() as source:
@@ -480,17 +532,3 @@ def run_flask_server():
 if __name__ == '__main__':
     threading.Thread(target=run_voice_recognition, daemon=True).start()
     run_flask_server()
-
-# # Flask 및 음성 인식을 병렬로 실행
-# def run_flask_server():
-#     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
-
-# if __name__ == '__main__':
-#     flask_thread = threading.Thread(target=run_flask_server,daemon=True)
-#     voice_thread = threading.Thread(target=voice_to_intent)
-
-#     flask_thread.start()
-#     voice_thread.start()
-
-#     flask_thread.join()
-#     voice_thread.join()
