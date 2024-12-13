@@ -15,6 +15,10 @@ from db import *
 import tensorflow as tf
 import threading
 import sys
+from konlpy.tag import Hannanum
+from geopy.geocoders import Nominatim
+import random
+from playsound import playsound
 
 app = Flask(__name__)
 # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
@@ -26,7 +30,7 @@ MODEL_PATH = "./data/speech_intent_model2.keras"
 TOKENIZER_PATH = "./data/tokenizer2.pkl"
 
 # 의도 라벨 정의
-LABEL_DICT = {0: "로보 호출", 1: "목적지 지정", 2: "하차", 3: "의미 없음"}
+LABEL_DICT = {0: "로보 호출", 1: "목적지 지정", 2: "하차", 3: "의미 없음",4:"부정", 5:"긍정"}
 MAX_LEN = 30
 
 # Focal Loss 정의
@@ -77,12 +81,43 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
 
+def respond_yes():
+    playsound("./data/respond_yes.wav")
+    
+def check_des():
+    playsound("./data/check_destination.wav")
+    
+def retake_des():
+    playsound("./data/retake_destination.wav")
+
+def go_des():
+    playsound("./data/go_destination.wav")
+
+def get_address_from_lat_long(latitude, longitude):
+    """
+    위도와 경도를 입력받아 해당하는 주소를 반환하는 함수
+
+    args:
+        latitude: 위도
+        longitude: 경도
+    
+    return
+        주소(string)
+    """
+    geolocator = Nominatim(user_agent="my_geocoder")
+    location = geolocator.reverse((latitude, longitude), language="ko")
+    if location is not None:
+        address = location.address
+        return address
+    else:
+        return "주소를 찾을 수 없습니다."
+
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/select_data', methods=['POST'])
+@app.route('/select_data', methods=['POST']) # need select query changed
 def get_data():
     criteria = request.json
     start_date = criteria.get('startDate')
@@ -234,53 +269,179 @@ def get_target():
     global target
     return str(target)
 
+@app.route('/address', methods=['POST'])
+def get_address():
+    """
+    args
+        json
+        {
+            "latitude" : 위도,
+            "longitude": 경도
+        }
+    return
+        json
+        {
+            "address": 주소
+        }
+    """
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    if latitude is None or longitude is None:
+        return jsonify({'error': '위도와 경도를 모두 입력해야 합니다.'}), 400
+
+    address = get_address_from_lat_long(latitude, longitude)
+    return jsonify({'address': address})
+
+@app.route('/get_lat_long', methods=['POST'])
+def get_lat_long():
+    """
+    args
+        json
+        {
+            "address": 주소
+        }
+    return
+        json
+        {
+            "latitude": 위도,
+            "longitude": 경도
+        }
+    """
+    data = request.get_json()
+    address = data.get('address')
+
+    if not address:
+        return jsonify({'error': '주소를 입력해야 합니다.'}), 400
+
+    geolocator = Nominatim(user_agent="my_geocoder")
+    location = geolocator.geocode(address, language="ko")
+
+    if location:
+        return jsonify({
+            'latitude': location.latitude,
+            'longitude': location.longitude
+        })
+    else:
+        return jsonify({'error': '주소를 찾을 수 없습니다.'}), 404
+    
+def emit_lat_long(address):
+    """
+    주어진 주소를 위경도로 변환하고 SocketIO를 통해 emit하는 함수.
+
+    args:
+        address: 변환할 주소(string)
+    """
+    if not address:
+        print("주소가 제공되지 않았습니다.")
+        return
+    
+    print(address)
+
+    geolocator = Nominatim(user_agent="my_geocoder")
+    location = geolocator.geocode(address, language="ko")
+
+    if location:
+        latitude = location.latitude
+        longitude = location.longitude
+        # SocketIO로 emit
+        socketio.emit('target_updated', {'target': address, 'latitude': latitude, 'longitude': longitude}, namespace='target_origin')
+        print(f"주소: {address} -> 위도: {latitude}, 경도: {longitude} 전송 완료.")
+    else:
+        print("주소를 찾을 수 없습니다.")
+
+
+
+@app.route('/random_taxi', methods=['GET'])
+def random_taxi():
+    query = "SELECT taxi_id, taxi_type, taxi_license FROM taxi WHERE status = 0"
+    raw_data = execute_query(query)
+
+    if not raw_data:
+        return jsonify({"message": "사용 가능한 택시가 없습니다."}), 404
+
+    random_taxi = random.choice(raw_data)
+
+    response = {
+        "taxi_id": random_taxi[0],
+        "taxi_type": random_taxi[1],
+        "taxi_license": random_taxi[2]
+    }
+    print(response)
+    return jsonify(response)
+
 # 주어 추출 함수
 def extract_subject(text):
     try:
-        morphs = kkma.pos(text)
-        subject = []
-        for word, pos in morphs:
-            if pos in ['NNG', 'NNP', 'SN', 'NNB']:
-                subject.append(word)
-            else:
-                if subject:
-                    break
-        return "".join(subject) if subject else None
+        # 1단계: 텍스트 정리 (불필요한 어미 제거)
+        text = re.sub(r"(가자|줘|으로|로|가)$", "", text).strip()
+
+        # 2단계: Hannanum 명사 추출
+        hannanum = Hannanum()
+        nouns = hannanum.nouns(text)
+
+        # 3단계: 숫자와 단위를 결합
+        combined_text = " ".join(nouns)
+        combined_text = re.sub(r"(\d+)(번|층|호|출구)", r"\1\2", combined_text)
+
+        # 4단계: 불필요한 단어 제거 (텍스트 끝에 남은 '으로', '로' 처리)
+        result = re.sub(r"(으로|로)$", "", combined_text.replace(" ", "")).strip()
+
+        return result if result else None
     except Exception as e:
         return f"주어 추출 중 오류: {e}"
 
-# 온도 조정된 예측 함수
+is_robot_called = False
 def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
+    global is_robot_called
     global target
     try:
         sequence = tokenizer.texts_to_sequences([text])
         padded_sequence = pad_sequences(sequence, maxlen=MAX_LEN, padding="post")
-
         logits = model.predict(padded_sequence) / temperature
         confidence = np.max(logits)
         predicted_label = np.argmax(logits)
         second_highest = sorted(logits.flatten())[-2]
         confidence_gap = confidence - second_highest
-
         label_scores = ", ".join([f"{LABEL_DICT[i]}: {logits[0][i]:.2f}" for i in range(len(LABEL_DICT))])
+        
+        # 로보 호출 처리
+        if predicted_label == 0 and confidence >= threshold:
+            is_robot_called = True  # 호출 상태 활성화
+            respond_yes() # 로보 호출 확인 음성
+            return f"'{text}' -> 예측: 로보 호출 (신뢰도: {confidence:.2f}), {label_scores}, 응답: 네"
+        
+        # 로보 호출이 활성화된 상태에서만 나머지 판단
+        if is_robot_called:
+            if predicted_label == 1 and confidence >= threshold:
+                subject = extract_subject(text)
+                target = subject
+                check_des()
+                print("목적지가 맞나 확인합니다.")
+                return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
+            elif predicted_label == 4 and confidence >= threshold:
+                print("목적지를 새로 입력하세요")
+                retake_des()
+            elif predicted_label == 5 and confidence >= threshold:
+                print("목적지가 확정 되었습니다")
+                go_des()
+                socketio.emit('target_updated', {'target': target})
+                # emit_lat_long(target)
+                is_robot_called = False # 확정되면 상태 초기화 
+        
+            elif predicted_label == 3:
+                is_robot_called = False  # 의미 없음이라도 상태 초기화
+                return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
 
-        if confidence < threshold or confidence_gap < gap_threshold:
-            return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
-
-        result = f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}"
-
-        if predicted_label in [1, 2] and confidence >= threshold:
-            subject = extract_subject(text)
-            target = subject
-            socketio.emit('target_updated', {'target': target})
-            result += f", 추출된 주어: {subject}"
-
-        return result
+        # 호출되지 않은 상태에서 다른 라벨 입력
+        return f"'{text}' -> 로보 호출 대기 중: {label_scores}"
 
     except Exception as e:
         return f"예측 중 오류 발생: {e}"
 
 # 음성을 의도로 변환
+
 def voice_to_intent():
     """실시간 음성 인식을 통해 텍스트를 의도로 변환"""
     with sr.Microphone() as source:
@@ -308,18 +469,28 @@ def voice_to_intent():
         except Exception as e:
             print(f"예기치 못한 오류 발생: {e}")
 
-# Flask 및 음성 인식을 병렬로 실행
+def run_voice_recognition():
+    while True:
+        voice_to_intent()
+
 def run_flask_server():
+    # app.run(host='0.0.0.0', port=5000, debug=True)
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
-    # socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    threading.Thread(target=run_voice_recognition, daemon=True).start()
+    run_flask_server()
 
-    flask_thread = threading.Thread(target=run_flask_server,daemon=True)
-    voice_thread = threading.Thread(target=voice_to_intent)
+# # Flask 및 음성 인식을 병렬로 실행
+# def run_flask_server():
+#     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
-    flask_thread.start()
-    voice_thread.start()
+# if __name__ == '__main__':
+#     flask_thread = threading.Thread(target=run_flask_server,daemon=True)
+#     voice_thread = threading.Thread(target=voice_to_intent)
 
-    flask_thread.join()
-    voice_thread.join()
+#     flask_thread.start()
+#     voice_thread.start()
+
+#     flask_thread.join()
+#     voice_thread.join()
