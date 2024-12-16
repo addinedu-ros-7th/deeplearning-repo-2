@@ -77,14 +77,18 @@ const Driving = () => {
   const [startLon, setStartLon] = useState(null);
   const [targetLat, setTargetLat] = useState(null);
   const [targetLon, setTargetLon] = useState(null);
-  const [route, setRoute] = useState([]);
+  const [route, setRoute] = useState([]); // 경로 상태 추가
   const [kakaoLoaded, setKakaoLoaded] = useState(false);
   const [isTargetChecked, setIsTargetChecked] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [activePopup, setActivePopup] = useState(null);
   const [socket, setSocket] = useState(null);
-  const [newTarget, setNewTarget] = useState('목적지를 설정해주세요.'); // 기본값 설정
-  const [newStartLocation, setNewStartLocation] = useState(''); // 기본값 설정
-  const [targetCheckMessage, setTargetCheckMessage] = useState(''); // 목적지 확인 메시지
+  const [newTarget, setNewTarget] = useState('목적지를 설정해주세요.');
+  const [newStartLocation, setNewStartLocation] = useState('');
+  const [targetCheckMessage, setTargetCheckMessage] = useState('');
+  const [taxiInfo, setTaxiInfo] = useState(null);
+
+  const [startCoords, setStartCoords] = useState(null); // 출발지 좌표
+  const [targetCoords, setTargetCoords] = useState(null); // 목적지 좌표
 
   // Kakao Maps API 로드
   useEffect(() => {
@@ -124,7 +128,7 @@ const Driving = () => {
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_checked });
       getLatLongFromAddress(data.target_checked);
       setNewTarget(data.target_checked); // 입력 박스에 현재 목표 설정
-      setIsPopupOpen(true); // 팝업 열기
+      setActivePopup('target'); // 목적지 설정 팝업 열기
     });
 
     newSocket.on('target_updated', async (data) => {
@@ -133,7 +137,7 @@ const Driving = () => {
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
       await getLatLongFromAddress(data.target_updated);
       setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
-      setIsPopupOpen(false); // 팝업 닫기
+      setActivePopup(null); // 팝업 닫기
     });
 
     return () => {
@@ -200,28 +204,94 @@ const Driving = () => {
     }
   };
 
+  const handleUpdateStartLocation = () => {
+    // 출발지 업데이트
+    setStartLocation(newStartLocation); // 새로운 출발지 설정
+    dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
+  
+    // 새로운 출발지의 위도와 경도를 가져옵니다.
+    getLatLongFromAddress(newStartLocation).then((coords) => {
+      if (coords) {
+        setStartLat(coords.latitude); // 새로운 출발지 위도 설정
+        setStartLon(coords.longitude); // 새로운 출발지 경도 설정
+      } else {
+        console.error("위도를 가져오는 중 오류 발생");
+      }
+    });
+  };
+  
+  const handleUpdateTarget = () => {
+    // 목적지 업데이트
+    setTarget(newTarget); // 새로운 목적지 설정
+    dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
+  
+    // 새로운 목적지의 위도와 경도를 가져옵니다.
+    getLatLongFromAddress(newTarget).then((coords) => {
+      if (coords) {
+        setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
+        setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
+      } else {
+        console.error("위도를 가져오는 중 오류 발생");
+      }
+    });
+  };
+  
   const handleCallTaxi = () => {
-    if (startLat && startLon && targetLat && targetLon) {
-      const start = new window.kakao.maps.LatLng(startLat, startLon);
-      const end = new window.kakao.maps.LatLng(targetLat, targetLon);
-      const directionsService = new window.kakao.maps.services.Directions();
-
-      directionsService.route({
-        origin: start,
-        destination: end,
-        callback: function (result, status) {
-          if (status === window.kakao.maps.services.Status.OK) {
-            const routePath = result.routes[0].path;
-            setRoute(routePath);
-          } else {
-            console.error('경로를 가져오는 중 오류 발생:', status);
-          }
+    // 위도와 경도가 유효한지 확인
+    if (startLat !== null && startLon !== null && targetLat !== null && targetLon !== null) {
+      const startPoint = newStartLocation; // 출발지
+      const endPoint = newTarget; // 목적지
+      const userId = 1; // 게스트 사용자를 위한 ID (예: 1)
+  
+      const requestData = {
+        userId,
+        startPoint,
+        endPoint
+      };
+  
+      // 출발지와 목적지 업데이트
+      dispatch({ type: 'UPDATE_START_LOCATION', payload: startPoint });
+      dispatch({ type: 'UPDATE_TARGET', payload: endPoint });
+  
+      fetch('http://localhost:5000/call_taxi', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(requestData),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message) {
+          setTaxiInfo(data); // 택시 정보를 상태로 설정
+          console.log(data);
+          setActivePopup('taxiInfo'); // 택시 정보 팝업 열기
+  
+          // 좌표 설정
+          const newStartCoords = new window.kakao.maps.LatLng(startLat, startLon);
+          const newTargetCoords = new window.kakao.maps.LatLng(targetLat, targetLon);
+  
+          setStartCoords(newStartCoords); // 출발지 좌표 설정
+          setTargetCoords(newTargetCoords); // 목적지 좌표 설정
+  
+          // 경로 설정
+          setRoute([
+            { lat: startLat, lng: startLon }, // 출발지
+            { lat: targetLat, lng: targetLon }  // 목적지
+          ]);
+        } else {
+          console.error(data.error);
+          alert('택시 호출 중 오류가 발생했습니다.');
+        }
+      })
+      .catch(error => {
+        console.error('API 호출 중 오류 발생:', error);
       });
     } else {
       console.error("출발지 또는 목적지의 위도와 경도를 확인하세요.");
     }
   };
+  
 
   useEffect(() => {
     getCurrentLocation();
@@ -233,34 +303,6 @@ const Driving = () => {
     }
   }, [isTargetChecked]);
 
-  const handleUpdateTarget = () => {
-    setTarget(newTarget);
-    dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
-    getLatLongFromAddress(newTarget).then((coords) => {
-      if (coords) {
-        setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
-        setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
-      }
-    });
-    setIsPopupOpen(false);
-  };
-
-  const handleUpdateStartLocation = () => {
-    // 출발지 수정을 반영
-    setStartLocation(newStartLocation);
-    dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
-    
-    // 새로운 출발지의 위도와 경도를 가져옵니다.
-    getLatLongFromAddress(newStartLocation).then((coords) => {
-      if (coords) {
-        setStartLat(coords.latitude); // 새로운 위도 설정
-        setStartLon(coords.longitude); // 새로운 경도 설정
-      }
-    });
-
-    setIsPopupOpen(false);
-  };
-
   const handleInputFocus = (setter) => {
     setter(''); // 입력 박스가 포커스될 때 기본값 지우기
   };
@@ -268,23 +310,31 @@ const Driving = () => {
   return (
     <Container>
       <Header>
-        <Button onClick={() => setIsPopupOpen(true)}>목적지 설정</Button>
-        <Button onClick={handleCallTaxi}>호출하기</Button>
+        <Button onClick={() => setActivePopup('target')}>목적지 설정</Button>
       </Header>
       <RouteLabel>
         {startLocation && target ? `${startLocation} -> ${target}` : ''}
       </RouteLabel>
       <MapContainer>
-        <KakaoMap 
-          startCoords={new window.kakao.maps.LatLng(startLat, startLon)} 
-          targetCoords={new window.kakao.maps.LatLng(targetLat, targetLon)} 
-          route={route} 
-        />
+        {kakaoLoaded && startCoords && targetCoords && (
+          // <KakaoMap 
+          //   startCoords={startCoords} 
+          //   targetCoords={targetCoords} 
+          //   route={route} 
+          // />
+          <KakaoMap 
+            startCoords={startCoords} 
+            targetCoords={targetCoords} 
+            route={route} 
+            startLocation={startLocation} // 출발지 정보 추가
+            target={target} // 목적지 정보 추가
+          />
+        )}
       </MapContainer>
-
-      {isPopupOpen && (
+  
+      {activePopup === 'target' && (
         <>
-          <Overlay onClick={() => setIsPopupOpen(false)} />
+          <Overlay onClick={() => setActivePopup(null)} />
           <Popup>
             <h2>목적지를 말해주세요.</h2>
             <p>{targetCheckMessage}</p>
@@ -294,33 +344,56 @@ const Driving = () => {
                 id="startInput"
                 type="text" 
                 value={newStartLocation} 
-                onFocus={() => handleInputFocus(setNewStartLocation)} // 포커스 시 기본값 지우기
-                onChange={(e) => setNewStartLocation(e.target.value)} 
+                onFocus={() => handleInputFocus(setNewStartLocation)} 
+                onChange={(e) => {
+                  setNewStartLocation(e.target.value);
+                  console.log("입력된 출발지:", e.target.value);
+                }} 
                 placeholder="현재 위치" 
-                isDefault={newStartLocation === ''} // 현재 위치가 설정되지 않았을 때 기본값
+                isDefault={newStartLocation === ''} 
               />
-          </div>
-          <div>
+            </div>
+            <div>
               <label htmlFor="targetInput">목적지:</label>
               <Input 
                 id="targetInput"
                 type="text" 
                 value={newTarget} 
-                onFocus={() => handleInputFocus(setNewTarget)} // 포커스 시 기본값 지우기
-                onChange={(e) => setNewTarget(e.target.value)} 
+                onFocus={() => handleInputFocus(setNewTarget)} 
+                onChange={(e) => {
+                  setNewTarget(e.target.value);
+                  console.log("입력된 목적지:", e.target.value);
+                }} 
                 placeholder="목적지를 입력하세요" 
-                isDefault={newTarget === '목적지를 설정해주세요.'} // 기본값에 따라 색상 변경
+                isDefault={newTarget === '목적지를 설정해주세요.'} 
               />
-          </div>
-            <Button onClick={handleUpdateStartLocation}>출발지 수정</Button>
-            <Button onClick={handleUpdateTarget}>목적지 수정하기</Button>
-            <Button onClick={() => setIsPopupOpen(false)}>취소</Button>
+            </div>
+            <Button onClick={() => {
+              handleUpdateStartLocation(); // 출발지 업데이트
+              handleUpdateTarget(); // 목적지 업데이트
+              handleCallTaxi(); // 택시 호출
+            }}>호출하기</Button>
+            <Button onClick={() => setActivePopup(null)}>취소</Button>
+          </Popup>
+        </>
+      )}
+  
+      {/* 택시 배차 정보 팝업 */}
+      {taxiInfo && activePopup === 'taxiInfo' && (
+        <>
+          <Overlay onClick={() => setActivePopup(null)} />
+          <Popup>
+            <h2>택시 배차 정보</h2>
+            <p>택시 ID: {taxiInfo.taxiId}</p>
+            <p>택시 종류: {taxiInfo.taxiType}</p>
+            <p>택시 라이센스: {taxiInfo.taxiLicense}</p>
+            <Button onClick={() => setActivePopup(null)}>닫기</Button>
           </Popup>
         </>
       )}
     </Container>
-  );
+  );  
+
 };
 
 export default Driving;
-
