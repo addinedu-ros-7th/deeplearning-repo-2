@@ -24,7 +24,6 @@ const Header = styled.div`
 const RouteLabel = styled.div`
   text-align: center;
   font-size: 20px;
-  // margin: 10px 0; /* 위아래 여백 추가 */
 `;
 
 const MapContainer = styled.div`
@@ -62,6 +61,14 @@ const Button = styled.button`
   cursor: pointer; /* 커서 모양 변경 */
 `;
 
+const Input = styled.input`
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  box-sizing: border-box; /* 패딩 포함하여 전체 너비 계산 */
+  color: ${props => (props.isDefault ? '#aaa' : '#000')}; /* 글자 색상 설정 */
+`;
+
 const Driving = () => {
   const dispatch = useDispatch();
   const [target, setTarget] = useState('');
@@ -75,6 +82,9 @@ const Driving = () => {
   const [isTargetChecked, setIsTargetChecked] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [socket, setSocket] = useState(null);
+  const [newTarget, setNewTarget] = useState('목적지를 설정해주세요.'); // 기본값 설정
+  const [newStartLocation, setNewStartLocation] = useState(''); // 기본값 설정
+  const [targetCheckMessage, setTargetCheckMessage] = useState(''); // 목적지 확인 메시지
 
   // Kakao Maps API 로드
   useEffect(() => {
@@ -110,8 +120,10 @@ const Driving = () => {
       console.log('목적지 확인:', data.target_checked);
       setIsTargetChecked(true);
       setTarget(data.target_checked);
+      setTargetCheckMessage(`${data.target_checked}가 맞습니까?`);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_checked });
       getLatLongFromAddress(data.target_checked);
+      setNewTarget(data.target_checked); // 입력 박스에 현재 목표 설정
       setIsPopupOpen(true); // 팝업 열기
     });
 
@@ -120,6 +132,7 @@ const Driving = () => {
       setTarget(data.target_updated);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
       await getLatLongFromAddress(data.target_updated);
+      setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
       setIsPopupOpen(false); // 팝업 닫기
     });
 
@@ -139,9 +152,7 @@ const Driving = () => {
       });
       const data = await response.json();
       if (data.latitude && data.longitude) {
-        setTargetLat(data.latitude);
-        setTargetLon(data.longitude);
-        console.log(`목적지 위도: ${data.latitude}, 경도: ${data.longitude}`);
+        return { latitude: data.latitude, longitude: data.longitude }; // 위도와 경도를 반환
       } else {
         console.error('위도와 경도를 가져오는 중 오류 발생:', data.error);
       }
@@ -159,6 +170,7 @@ const Driving = () => {
           setStartLocation(address);
           setStartLat(latitude);
           setStartLon(longitude);
+          setNewStartLocation(address); // 현재 위치를 기본값으로 설정
           console.log(`출발지 위도: ${latitude}, 경도: ${longitude}`);
           dispatch({ type: 'UPDATE_START_LOCATION', payload: address });
         },
@@ -221,6 +233,38 @@ const Driving = () => {
     }
   }, [isTargetChecked]);
 
+  const handleUpdateTarget = () => {
+    setTarget(newTarget);
+    dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
+    getLatLongFromAddress(newTarget).then((coords) => {
+      if (coords) {
+        setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
+        setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
+      }
+    });
+    setIsPopupOpen(false);
+  };
+
+  const handleUpdateStartLocation = () => {
+    // 출발지 수정을 반영
+    setStartLocation(newStartLocation);
+    dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
+    
+    // 새로운 출발지의 위도와 경도를 가져옵니다.
+    getLatLongFromAddress(newStartLocation).then((coords) => {
+      if (coords) {
+        setStartLat(coords.latitude); // 새로운 위도 설정
+        setStartLon(coords.longitude); // 새로운 경도 설정
+      }
+    });
+
+    setIsPopupOpen(false);
+  };
+
+  const handleInputFocus = (setter) => {
+    setter(''); // 입력 박스가 포커스될 때 기본값 지우기
+  };
+
   return (
     <Container>
       <Header>
@@ -242,8 +286,35 @@ const Driving = () => {
         <>
           <Overlay onClick={() => setIsPopupOpen(false)} />
           <Popup>
-            <h2>목적지를 입력해주세요.</h2>
-            <p>현재 인식된 목적지: {target}</p>
+            <h2>목적지를 말해주세요.</h2>
+            <p>{targetCheckMessage}</p>
+            <div>
+              <label htmlFor="startInput">출발지:</label>
+              <Input 
+                id="startInput"
+                type="text" 
+                value={newStartLocation} 
+                onFocus={() => handleInputFocus(setNewStartLocation)} // 포커스 시 기본값 지우기
+                onChange={(e) => setNewStartLocation(e.target.value)} 
+                placeholder="현재 위치" 
+                isDefault={newStartLocation === ''} // 현재 위치가 설정되지 않았을 때 기본값
+              />
+          </div>
+          <div>
+              <label htmlFor="targetInput">목적지:</label>
+              <Input 
+                id="targetInput"
+                type="text" 
+                value={newTarget} 
+                onFocus={() => handleInputFocus(setNewTarget)} // 포커스 시 기본값 지우기
+                onChange={(e) => setNewTarget(e.target.value)} 
+                placeholder="목적지를 입력하세요" 
+                isDefault={newTarget === '목적지를 설정해주세요.'} // 기본값에 따라 색상 변경
+              />
+          </div>
+            <Button onClick={handleUpdateStartLocation}>출발지 수정</Button>
+            <Button onClick={handleUpdateTarget}>목적지 수정하기</Button>
+            <Button onClick={() => setIsPopupOpen(false)}>취소</Button>
           </Popup>
         </>
       )}
@@ -252,3 +323,4 @@ const Driving = () => {
 };
 
 export default Driving;
+
