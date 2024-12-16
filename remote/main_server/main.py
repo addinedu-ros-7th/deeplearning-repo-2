@@ -92,6 +92,18 @@ def retake_des():
 
 def go_des():
     playsound("./data/go_destination.wav")
+    
+def not_understand():
+    playsound("./data/not_understand.wav")
+    
+def play_feedback_wav():
+    playsound("feedback.wav")
+    
+from gtts import gTTS
+
+def create_feedback_wav(text):
+    tts = gTTS(text=text, lang='ko')
+    tts.save("feedback.wav")
 
 def get_address_from_lat_long(latitude, longitude):
     """
@@ -437,7 +449,62 @@ def extract_subject(text):
     except Exception as e:
         return f"주어 추출 중 오류: {e}"
 
-# 호출 상태를 관리하는 변수
+# # 호출 상태를 관리하는 변수 기존거는 주석처리
+# is_robot_called = False
+# # 온도 조정된 예측 함수
+# def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
+#     global is_robot_called
+#     global target
+#     try:
+#         sequence = tokenizer.texts_to_sequences([text])
+#         padded_sequence = pad_sequences(sequence, maxlen=MAX_LEN, padding="post")
+#         logits = model.predict(padded_sequence) / temperature
+#         confidence = np.max(logits)
+#         predicted_label = np.argmax(logits)
+#         second_highest = sorted(logits.flatten())[-2]
+#         confidence_gap = confidence - second_highest
+#         label_scores = ", ".join([f"{LABEL_DICT[i]}: {logits[0][i]:.2f}" for i in range(len(LABEL_DICT))])
+        
+#         # 로보 호출 처리
+#         if predicted_label == 0 and confidence >= threshold:
+#             is_robot_called = True  # 호출 상태 활성화
+#             respond_yes() # 로보 호출 확인 음성
+#             return f"'{text}' -> 예측: 로보 호출 (신뢰도: {confidence:.2f}), {label_scores}, 응답: 네"
+        
+#         # 로보 호출이 활성화된 상태에서만 나머지 판단
+#         if is_robot_called:
+#             if predicted_label == 1 and confidence >= threshold:
+#                 subject = extract_subject_des(text)
+#                 target = subject
+#                 check_des()
+#                 print("목적지가 맞나 확인합니다.")
+#                 return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
+            
+#             elif predicted_label == 4 and confidence >= threshold:
+#                 print("목적지를 새로 입력하세요")
+#                 retake_des()
+            
+#             elif predicted_label == 5 and confidence >= threshold:
+#                 print("목적지가 확정 되었습니다")
+#                 go_des()
+#                 socketio.emit('target_updated', {'target': target})
+#                 is_robot_called = False # 확정되면 상태 초기화 
+            
+#             elif predicted_label == 2 and confidence >= threshold:
+#                 subject2 = extract_subject_hacha(text)
+#                 target = subject2
+#                 is_robot_called = False # 하차한다고하면 상태 초기화
+            
+#             elif predicted_label == 3:
+#                 is_robot_called = False  # 의미 없음이라도 상태 초기화
+#                 return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
+
+#         # 호출되지 않은 상태에서 다른 라벨 입력
+#         return f"'{text}' -> 로보 호출 대기 중: {label_scores}"
+
+#     except Exception as e:
+#         return f"예측 중 오류 발생: {e}"
+    
 is_robot_called = False
 # 온도 조정된 예측 함수
 def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
@@ -458,14 +525,24 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
             is_robot_called = True  # 호출 상태 활성화
             respond_yes() # 로보 호출 확인 음성
             return f"'{text}' -> 예측: 로보 호출 (신뢰도: {confidence:.2f}), {label_scores}, 응답: 네"
+        # 호출이 안된 상태에서 의미없는 단어가 왔을때 
         
+        if (is_robot_called == False) and ((predicted_label == 3 and confidence >= threshold ) or (confidence < threshold or confidence_gap < gap_threshold)):
+            not_understand()
         # 로보 호출이 활성화된 상태에서만 나머지 판단
         if is_robot_called:
             if predicted_label == 1 and confidence >= threshold:
                 subject = extract_subject_des(text)
                 target = subject
-                check_des()
+                # check_des()
+                # print("목적지가 맞나 확인합니다.")
+                        # 피드백 질문 생성
+                feedback_question = f"{target} 목적지가 맞습니까?"
+                # 음성 파일 생성 (TTS 활용)
+                create_feedback_wav(feedback_question)
+                 # 질문 출력 및 재생
                 print("목적지가 맞나 확인합니다.")
+                play_feedback_wav()
                 return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
             
             elif predicted_label == 4 and confidence >= threshold:
@@ -482,11 +559,13 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
                 subject2 = extract_subject_hacha(text)
                 target = subject2
                 is_robot_called = False # 하차한다고하면 상태 초기화
-            
-            elif predicted_label == 3:
-                is_robot_called = False  # 의미 없음이라도 상태 초기화
+            # 즉 별로 쓸모없는 문장 or 이상하게 인식되었다.
+            elif (predicted_label == 3 and confidence >= threshold ) or (confidence < threshold or confidence_gap < gap_threshold):
+                not_understand()
+                is_robot_called = True  # 여전히 호출은 되어있는 상태
+                
                 return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
-
+        
         # 호출되지 않은 상태에서 다른 라벨 입력
         return f"'{text}' -> 로보 호출 대기 중: {label_scores}"
 
