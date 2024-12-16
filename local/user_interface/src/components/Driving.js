@@ -7,25 +7,59 @@ import KakaoMap from './KakaoMap'; // KakaoMap 컴포넌트 import
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  height: 100vh; /* 전체 높이를 100%로 설정 */
+  width: 100%;
+`;
+
+const Header = styled.div`
+  display: flex;
+  justify-content: space-between; /* 버튼을 양쪽에 배치 */
+  align-items: center; /* 수직 중앙 정렬 */
   padding: 20px;
+  background-color: white; /* 배경 색상 설정 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%; /* 가로 100% */
 `;
 
-const TargetDisplay = styled.div`
-  margin: 20px;
-  font-size: 24px;
-`;
-
-const LocationDisplay = styled.div`
-  margin: 20px;
+const RouteLabel = styled.div`
+  text-align: center;
   font-size: 20px;
+  // margin: 10px 0; /* 위아래 여백 추가 */
+`;
+
+const MapContainer = styled.div`
+  flex: 1; /* 남은 공간을 모두 차지하도록 설정 */
+  position: relative; /* 자식 요소의 절대 위치 설정을 위해 */
+  width: 100%; /* 가로 100% */
+`;
+
+const Popup = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 20px;
+  z-index: 1000;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
 `;
 
 const Button = styled.button`
-  margin: 10px;
+  margin: 0 10px; /* 버튼 간격 설정 */
   padding: 10px 20px;
   font-size: 16px;
+  cursor: pointer; /* 커서 모양 변경 */
 `;
 
 const Driving = () => {
@@ -34,12 +68,13 @@ const Driving = () => {
   const [startLocation, setStartLocation] = useState('');
   const [startLat, setStartLat] = useState(null);
   const [startLon, setStartLon] = useState(null);
-  const [socket, setSocket] = useState(null);
   const [targetLat, setTargetLat] = useState(null);
   const [targetLon, setTargetLon] = useState(null);
   const [route, setRoute] = useState([]);
   const [kakaoLoaded, setKakaoLoaded] = useState(false);
-  const [isTargetChecked, setIsTargetChecked] = useState(false); // 목적지 확인 상태 추가
+  const [isTargetChecked, setIsTargetChecked] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [socket, setSocket] = useState(null);
 
   // Kakao Maps API 로드
   useEffect(() => {
@@ -66,21 +101,26 @@ const Driving = () => {
     const newSocket = io('http://localhost:5000');
     setSocket(newSocket);
 
-    // 목적지 확인 이벤트 수신
+    newSocket.on('connect', () => {
+      console.log('서버에 연결되었습니다.');
+      newSocket.emit('request_target');  // 서버에 목적지 요청
+    });
+
     newSocket.on('target_checked', (data) => {
       console.log('목적지 확인:', data.target_checked);
       setIsTargetChecked(true);
       setTarget(data.target_checked);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_checked });
       getLatLongFromAddress(data.target_checked);
+      setIsPopupOpen(true); // 팝업 열기
     });
 
-    // 최종 목적지 업데이트 이벤트 수신
     newSocket.on('target_updated', async (data) => {
       console.log('수신된 목적지:', data.target_updated);
       setTarget(data.target_updated);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
       await getLatLongFromAddress(data.target_updated);
+      setIsPopupOpen(false); // 팝업 닫기
     });
 
     return () => {
@@ -183,19 +223,30 @@ const Driving = () => {
 
   return (
     <Container>
-      <h1>Driving Component</h1>
-      <TargetDisplay>
-        {target ? `목적지: ${target}` : '목적지를 설정하세요.'}
-      </TargetDisplay>
-      <LocationDisplay>
-        {startLocation ? `현재 위치: ${startLocation}` : '현재 위치를 가져오는 중입니다...'}
-      </LocationDisplay>
-      <Button onClick={handleCallTaxi}>호출하기</Button>
-      <KakaoMap 
-        startCoords={new window.kakao.maps.LatLng(startLat, startLon)} 
-        targetCoords={new window.kakao.maps.LatLng(targetLat, targetLon)} 
-        route={route} 
-      />
+      <Header>
+        <Button onClick={() => setIsPopupOpen(true)}>목적지 설정</Button>
+        <Button onClick={handleCallTaxi}>호출하기</Button>
+      </Header>
+      <RouteLabel>
+        {startLocation && target ? `${startLocation} -> ${target}` : ''}
+      </RouteLabel>
+      <MapContainer>
+        <KakaoMap 
+          startCoords={new window.kakao.maps.LatLng(startLat, startLon)} 
+          targetCoords={new window.kakao.maps.LatLng(targetLat, targetLon)} 
+          route={route} 
+        />
+      </MapContainer>
+
+      {isPopupOpen && (
+        <>
+          <Overlay onClick={() => setIsPopupOpen(false)} />
+          <Popup>
+            <h2>목적지를 입력해주세요.</h2>
+            <p>현재 인식된 목적지: {target}</p>
+          </Popup>
+        </>
+      )}
     </Container>
   );
 };

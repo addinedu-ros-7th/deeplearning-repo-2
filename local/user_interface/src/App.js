@@ -8,7 +8,6 @@ import store from './store'; // Redux 스토어 가져오기
 import TaxiList from './components/TaxiList';
 import PieChart from './components/PieChart';
 import UserMoney from './components/UserMoney';
-import KakaoMap from './components/KakaoMap';
 import Driving from './components/Driving';
 
 const Container = styled.div`
