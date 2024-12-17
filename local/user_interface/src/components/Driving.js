@@ -3,71 +3,16 @@ import { useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
 import styled from 'styled-components';
 import KakaoMap from './KakaoMap'; // KakaoMap 컴포넌트 import
-
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh; /* 전체 높이를 100%로 설정 */
-  width: 100%;
-`;
-
-const Header = styled.div`
-  display: flex;
-  justify-content: space-between; /* 버튼을 양쪽에 배치 */
-  align-items: center; /* 수직 중앙 정렬 */
-  padding: 20px;
-  background-color: white; /* 배경 색상 설정 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  width: 100%; /* 가로 100% */
-`;
-
-const RouteLabel = styled.div`
-  text-align: center;
-  font-size: 20px;
-`;
-
-const MapContainer = styled.div`
-  flex: 1; /* 남은 공간을 모두 차지하도록 설정 */
-  position: relative; /* 자식 요소의 절대 위치 설정을 위해 */
-  width: 100%; /* 가로 100% */
-`;
-
-const Popup = styled.div`
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: white;
-  border: 1px solid #ccc;
-  padding: 20px;
-  z-index: 1000;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-`;
-
-const Overlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-`;
-
-const Button = styled.button`
-  margin: 0 10px; /* 버튼 간격 설정 */
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer; /* 커서 모양 변경 */
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  box-sizing: border-box; /* 패딩 포함하여 전체 너비 계산 */
-  color: ${props => (props.isDefault ? '#aaa' : '#000')}; /* 글자 색상 설정 */
-`;
+import { 
+  Container, 
+  Header, 
+  RouteLabel, 
+  MapContainer, 
+  Popup, 
+  Overlay, 
+  Button, 
+  Input 
+} from './DrivingStyled'; 
 
 const Driving = () => {
   const dispatch = useDispatch();
@@ -86,11 +31,11 @@ const Driving = () => {
   const [newStartLocation, setNewStartLocation] = useState('');
   const [targetCheckMessage, setTargetCheckMessage] = useState('');
   const [taxiInfo, setTaxiInfo] = useState(null);
-
   const [startCoords, setStartCoords] = useState(null); // 출발지 좌표
   const [targetCoords, setTargetCoords] = useState(null); // 목적지 좌표
+  const [updateReady, setUpdateReady] = useState(false);
 
-  // Kakao Maps API 로드
+  // kakao map api load
   useEffect(() => {
     const loadKakaoMap = () => {
       const script = document.createElement('script');
@@ -111,15 +56,18 @@ const Driving = () => {
     loadKakaoMap();
   }, []);
 
+  // socketio connecting
   useEffect(() => {
     const newSocket = io('http://localhost:5000');
     setSocket(newSocket);
 
+    // basic connect
     newSocket.on('connect', () => {
       console.log('서버에 연결되었습니다.');
       newSocket.emit('request_target');  // 서버에 목적지 요청
     });
 
+    // target checked receivce
     newSocket.on('target_checked', (data) => {
       console.log('목적지 확인:', data.target_checked);
       setIsTargetChecked(true);
@@ -131,6 +79,7 @@ const Driving = () => {
       setActivePopup('target'); // 목적지 설정 팝업 열기
     });
 
+    // target update receivce
     newSocket.on('target_updated', async (data) => {
       console.log('수신된 목적지:', data.target_updated);
       setTarget(data.target_updated);
@@ -204,42 +153,15 @@ const Driving = () => {
     }
   };
 
-  const handleUpdateStartLocation = () => {
-    // 출발지 업데이트
-    setStartLocation(newStartLocation); // 새로운 출발지 설정
-    dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
-  
-    // 새로운 출발지의 위도와 경도를 가져옵니다.
-    getLatLongFromAddress(newStartLocation).then((coords) => {
-      if (coords) {
-        setStartLat(coords.latitude); // 새로운 출발지 위도 설정
-        setStartLon(coords.longitude); // 새로운 출발지 경도 설정
-      } else {
-        console.error("위도를 가져오는 중 오류 발생");
-      }
-    });
-    console.log(startLon,startLat)
-  };
-  
-  const handleUpdateTarget = () => {
-    // 목적지 업데이트
-    setTarget(newTarget); // 새로운 목적지 설정
-    dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
-  
-    // 새로운 목적지의 위도와 경도를 가져옵니다.
-    getLatLongFromAddress(newTarget).then((coords) => {
-      if (coords) {
-        setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
-        setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
-      } else {
-        console.error("위도를 가져오는 중 오류 발생");
-      }
-    });
-    console.log(targetLon, targetLat);
-  };
+  useEffect(() => {
+    if ( updateReady && startLat !== null && startLon !== null && targetLat !== null && targetLon !== null) {
+      handleCallTaxi();
+    }
+  }, [updateReady, startLat, startLon, targetLat, targetLon]);
   
   const handleCallTaxi = () => {
     // 위도와 경도가 유효한지 확인
+    console.log(startLat, startLon, targetLat, targetLon );
     if (startLat !== null && startLon !== null && targetLat !== null && targetLon !== null) {
       const startPoint = newStartLocation; // 출발지
       const endPoint = newTarget; // 목적지
@@ -294,6 +216,77 @@ const Driving = () => {
     }
   };
   
+  // const handleUpdateStartLocation = () => {
+  //   // 출발지 업데이트
+  //   setStartLocation(newStartLocation); // 새로운 출발지 설정
+  //   dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
+    
+  //   // 새로운 출발지의 위도와 경도를 가져옵니다.
+  //   getLatLongFromAddress(newStartLocation).then((coords) => {
+  //     if (coords) {
+  //       setStartLat(coords.latitude); // 새로운 출발지 위도 설정
+  //       setStartLon(coords.longitude); // 새로운 출발지 경도 설정
+  //       console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+  //     } else {
+  //       console.error("위도를 가져오는 중 오류 발생");
+  //     }
+  //   });
+  // };
+  
+  // const handleUpdateTarget = () => {
+  //   // 목적지 업데이트
+  //   setTarget(newTarget); // 새로운 목적지 설정
+  //   dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
+    
+  //   // 새로운 목적지의 위도와 경도를 가져옵니다.
+  //   getLatLongFromAddress(newTarget).then((coords) => {
+  //     if (coords) {
+  //       setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
+  //       setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
+  //       console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+  //       handleCallTaxi();
+  //     } else {
+  //       console.error("위도를 가져오는 중 오류 발생");
+  //     }
+  //   });
+  // };
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const handleUpdateStartLocation = async () => {
+      setStartLocation(newStartLocation); // 새로운 출발지 설정
+      dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
+
+      // 새로운 출발지의 위도와 경도를 가져옵니다.
+      const coords = await getLatLongFromAddress(newStartLocation);
+      if (coords) {
+          setStartLat(coords.latitude); // 새로운 출발지 위도 설정
+          setStartLon(coords.longitude); // 새로운 출발지 경도 설정
+          console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+          // 상태 업데이트가 반영될 시간을 기다립니다.
+          await delay(100); // 필요한 만큼의 딜레이를 조정
+      } else {
+          console.error("위도를 가져오는 중 오류 발생");
+          throw new Error("출발지 위도/경도 오류");
+      }
+  };
+
+  const handleUpdateTarget = async () => {
+      setTarget(newTarget); // 새로운 목적지 설정
+      dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
+
+      // 새로운 목적지의 위도와 경도를 가져옵니다.
+      const coords = await getLatLongFromAddress(newTarget);
+      if (coords) {
+          setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
+          setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
+          console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+          // 상태 업데이트가 반영될 시간을 기다립니다.
+          await delay(100); // 필요한 만큼의 딜레이를 조정
+      } else {
+          console.error("위도를 가져오는 중 오류 발생");
+          throw new Error("목적지 위도/경도 오류");
+      }
+  };
 
   useEffect(() => {
     getCurrentLocation();
@@ -309,6 +302,16 @@ const Driving = () => {
     setter(''); // 입력 박스가 포커스될 때 기본값 지우기
   };
 
+  const handleCallButton = async () => {
+    try {
+      await handleUpdateStartLocation();
+      await handleUpdateTarget();
+      setUpdateReady(true);
+    } catch (error) {
+      console.log('hondleCallButton error :',error);
+    }
+  }
+
   return (
     <Container>
       <Header>
@@ -319,11 +322,6 @@ const Driving = () => {
       </RouteLabel>
       <MapContainer>
         {kakaoLoaded && startCoords && targetCoords && (
-          // <KakaoMap 
-          //   startCoords={startCoords} 
-          //   targetCoords={targetCoords} 
-          //   route={route} 
-          // />
           <KakaoMap 
             startCoords={startCoords} 
             targetCoords={targetCoords} 
@@ -351,7 +349,7 @@ const Driving = () => {
                   setNewStartLocation(e.target.value);
                   console.log("입력된 출발지:", e.target.value);
                 }} 
-                placeholder="현재 위치" 
+                placeholder={setNewStartLocation}
                 isDefault={newStartLocation === ''} 
               />
             </div>
@@ -370,17 +368,12 @@ const Driving = () => {
                 isDefault={newTarget === '목적지를 설정해주세요.'} 
               />
             </div>
-            <Button onClick={() => {
-              handleUpdateStartLocation(); // 출발지 업데이트
-              handleUpdateTarget(); // 목적지 업데이트
-              handleCallTaxi(); // 택시 호출
-            }}>호출하기</Button>
+            <Button onClick={handleCallButton}>호출하기</Button>
             <Button onClick={() => setActivePopup(null)}>취소</Button>
           </Popup>
         </>
       )}
   
-      {/* 택시 배차 정보 팝업 */}
       {taxiInfo && activePopup === 'taxiInfo' && (
         <>
           <Overlay onClick={() => setActivePopup(null)} />
@@ -395,7 +388,6 @@ const Driving = () => {
       )}
     </Container>
   );  
-
 };
 
 export default Driving;
