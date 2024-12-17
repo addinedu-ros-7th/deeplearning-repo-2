@@ -57,8 +57,8 @@ except Exception as e:
 recognizer = sr.Recognizer()
 kkma = Kkma()
 
-cap = None
 global target
+cap = None
 
 def initialize_camera():
     global cap
@@ -82,7 +82,46 @@ def generate_frames():
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
+#YOLO 모델 경로
+# MODEL_PATH_YOLO = "/home/dw/ws/git_ws/deeplearning-repo-2/remote/main_server/data/traffic_light_best.pt"
 
+# # 모델 로딩 (CPU로 변경)
+# model_yolo = YOLO(MODEL_PATH_YOLO)
+
+# def initialize_camera():
+#     global cap
+#     global target
+#     cap = cv2.VideoCapture(2)  # 카메라 인덱스 확인 필요
+#     target = None
+
+# def generate_frames():
+#     global cap
+#     if cap is None:
+#         initialize_camera()
+
+#     while True:
+#         success, frame = cap.read()
+#         if not success:
+#             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+#             continue
+#         # #BGR -> RGB 변환
+#         # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#         # # YOLO 추론
+#         # results = model_yolo.predict(frame_rgb)
+#         results = model_yolo.predict(frame)
+#         # 결과 체크 후 plot
+#         if len(results) > 0:
+#             annotated_frame = results[0].plot()
+#         else:
+#             # 검출 없는 경우 원본 프레임 사용
+#             annotated_frame = frame
+#         # JPG 인코딩
+#         _, buffer = cv2.imencode('.jpg', annotated_frame)
+#         frame_data = buffer.tobytes()
+
+#         # YIELD로 이미지 바이너리 스트림 반환
+#         yield (b'--frame\r\n'
+#                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
 def respond_yes():
     playsound("./data/calling.wav")
 
@@ -498,291 +537,41 @@ def call_taxi():
     except Exception as e:
         print(f"서버 오류: {e}")
         return jsonify({'error': '서버에서 오류가 발생했습니다.'}), 500
-
-# 주어 추출 함수
-def extract_subject_des(text):
-
-    try:
-
-        # 1단계: 텍스트 정리 (불필요한 어미 제거)
-
-        text = re.sub(r"(가자|줘|으로|로|가)$", "", text).strip()
-
-
-
-        # 2단계: 숫자와 단위 연결 (띄어쓰기 처리)
-
-        text = re.sub(r"(\d+)\s+(번|층|호|출구)", r"\1\2", text)
-
-
-
-        # 3단계: 하이픈 연결 (숫자-숫자 형태 유지)
-
-        text = re.sub(r"(\d+)\s*-\s*(\d+)", r"\1-\2", text)
-
-
-
-        # 4단계: Hannanum 명사 추출
-
-        hannanum = Hannanum()
-
-        nouns = hannanum.nouns(text)
-
-
-
-        # 5단계: 숫자와 단위를 결합
-
-        combined_text = " ".join(nouns)
-
-        combined_text = re.sub(r"(\d+)(번|층|호|출구)", r"\1\2", combined_text)
-
-
-
-        # 6단계: 불필요한 단어 제거 (텍스트 끝에 남은 '으로', '로' 처리)
-
-        result = re.sub(r"(으로|로)$", "", combined_text.replace(" ", "")).strip()
-
-
-
-        return result if result else None
-
-    except Exception as e:
-
-        return f"주어 추출 중 오류: {e}"
-
-def extract_subject_hacha(text):
-
-    try:
-
-        # 1단계: 불필요한 어미 제거
-
-        text = re.sub(r"(내려줘|세워줘|멈춰|으로|로|가)$", "", text).strip()
-
-
-
-        # 2단계: Hannanum 명사 추출
-
-        hannanum = Hannanum()
-
-        nouns = hannanum.nouns(text)
-
-
-
-        # 3단계: 의미 있는 단어 결합
-
-        combined_text = " ".join(nouns)
-
-
-
-        # 4단계: 위치 관련 표현 정리 (띄어쓰기와 불필요한 단어 제거)
-
-        combined_text = re.sub(r"(앞|뒤|여기|저기|지금|바로|횡단보도|카페|길|사거리|코너)", r" \1", combined_text)
-
-        result = combined_text.replace(" ", "").strip()
-
-
-
-        return result if result else None
-
-    except Exception as e:
-
-        return f"하차 주어 추출 중 오류: {e}"
-
-
-is_robot_called = False
-# 온도 조정된 예측 함수
-
-def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, temperature=1.0):
-
-    global is_robot_called
-
-    global target
-
-    try:
-
-        sequence = tokenizer.texts_to_sequences([text])
-
-        padded_sequence = pad_sequences(sequence, maxlen=MAX_LEN, padding="post")
-
-        logits = model.predict(padded_sequence) / temperature
-
-        confidence = np.max(logits)
-
-        predicted_label = np.argmax(logits)
-
-        second_highest = sorted(logits.flatten())[-2]
-
-        confidence_gap = confidence - second_highest
-
-        label_scores = ", ".join([f"{LABEL_DICT[i]}: {logits[0][i]:.2f}" for i in range(len(LABEL_DICT))])
-
-        
-
-        # 로보 호출 처리
-
-        if predicted_label == 0 and confidence >= threshold:
-
-            is_robot_called = True  # 호출 상태 활성화
-
-            respond_yes() # 로보 호출 확인 음성
-
-            return f"'{text}' -> 예측: 로보 호출 (신뢰도: {confidence:.2f}), {label_scores}, 응답: 네"
-
-        # 호출이 안된 상태에서 의미없는 단어가 왔을때 
-
-        
-
-        if (is_robot_called == False) and ((predicted_label == 3 and confidence >= threshold ) or (confidence < threshold or confidence_gap < gap_threshold)):
-
-            not_understand()
-
-        # 로보 호출이 활성화된 상태에서만 나머지 판단
-
-        if is_robot_called:
-
-            if predicted_label == 1 and confidence >= threshold:
-
-                subject = extract_subject_des(text)
-
-                target = subject
-
-                # check_des()
-
-                # print("목적지가 맞나 확인합니다.")
-
-                        # 피드백 질문 생성
-
-                feedback_question = f"{target} 목적지가 맞습니까?"
-
-                # 음성 파일 생성 (TTS 활용)
-
-                create_feedback_wav(feedback_question)
-
-                socketio.emit('target_checked', {'target_checked': target})
-
-                 # 질문 출력 및 재생
-
-                print("목적지가 맞나 확인합니다.")
-
-                play_feedback_wav()
-
-                return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
-
-            
-
-            elif predicted_label == 4 and confidence >= threshold:
-
-                print("목적지를 새로 입력하세요")
-
-                retake_des()
-
-            
-
-            elif predicted_label == 5 and confidence >= threshold:
-
-                print("목적지가 확정 되었습니다")
-
-                go_des()
-
-                socketio.emit('target_updated', {'target_updated': target})
-
-                is_robot_called = False # 확정되면 상태 초기화 
-
-            
-
-            elif predicted_label == 2 and confidence >= threshold:
-
-                subject2 = extract_subject_hacha(text)
-
-                target = subject2
-
-                is_robot_called = False # 하차한다고하면 상태 초기화
-
-            # 즉 별로 쓸모없는 문장 or 이상하게 인식되었다.
-
-            elif (predicted_label == 3 and confidence >= threshold ) or (confidence < threshold or confidence_gap < gap_threshold):
-
-                not_understand()
-
-                is_robot_called = True  # 여전히 호출은 되어있는 상태
-
-                
-
-                return f"'{text}' -> 최종 결과: 의미 없음 (신뢰도: {confidence:.2f}), {label_scores}"
-
-        
-
-        # 호출되지 않은 상태에서 다른 라벨 입력
-
-        return f"'{text}' -> 로보 호출 대기 중: {label_scores}"
-
-
-
-    except Exception as e:
-
-        return f"예측 중 오류 발생: {e}"
     
-# 음성을 의도로 변환
-def voice_to_intent():
-
-    """실시간 음성 인식을 통해 텍스트를 의도로 변환"""
-
-    with sr.Microphone() as source:
-
-        print("음성 인식 준비 중...")
-
-        recognizer.adjust_for_ambient_noise(source, duration=1)
-
-        recognizer.pause_threshold = 2.0
-
-        print("준비 완료! 말씀하세요 (Ctrl+C로 종료)")
-
-
-
-        # while True:  # 지속적으로 음성을 처리하기 위해 반복
-
-        try:
-
-            print("음성을 기다리는 중...")
-
-            audio = recognizer.listen(source, timeout=None)
-
-            print("음성을 처리 중입니다...")
+# voice2.py에서 목표 값 수신
+@socketio.on('target_updated')
+def handle_update_target(data):
+    global target
+    print(data)
+    print(data.get('target_updated'))
+    target = data.get('target_updated')
+    print(f"목표 위치 업데이트됨: {target}")
+    
+    # 웹 클라이언트로 브로드캐스트
+    socketio.emit('target_updated', {'target_updated': target})
+    print(target)
+    
+@socketio.on('target_checked')
+def handle_checked_target(data):
+    global target
+    print(data)
+    print(data.get('target_checked'))
+    target = data.get('target_checked')
+    print(f"목표 위치 업데이트됨: {target}")
+    
+    # 웹 클라이언트로 브로드캐스트
+    socketio.emit('target_checked', {'target_checked': target})
+    print(target)
 
 
+# def run_voice_recognition():
+#     while True:
+#         voice_to_intent()
 
-            text = recognizer.recognize_google(audio, language="ko-KR")
-
-            print(f"인식된 텍스트: {text}")
-
-
-
-            prediction = predict_with_temperature_adjustment(text)
-
-            print(f"예측 결과: {prediction}")
-
-
-
-        except sr.UnknownValueError:
-
-            print("음성을 인식할 수 없습니다.")
-
-        except KeyboardInterrupt:
-
-            print("음성 인식이 중단되었습니다.")
-
-        except Exception as e:
-
-            print(f"예기치 못한 오류 발생: {e}")
-
-def run_voice_recognition():
-    while True:
-        voice_to_intent()
-
-def run_flask_server():
+# def run_flask_server():
     # app.run(host='0.0.0.0', port=5000, debug=True)
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
-    threading.Thread(target=run_voice_recognition, daemon=True).start()
-    run_flask_server()
+    # threading.Thread(target=run_voice_recognition, daemon=True).start()
+    # run_flask_server()
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)

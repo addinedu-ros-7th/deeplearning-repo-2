@@ -19,32 +19,13 @@ from konlpy.tag import Hannanum
 from geopy.geocoders import Nominatim
 import random
 from playsound import playsound
-from datetime import datetime, timedelta
-import os
-import speech_recognition as sr
-import numpy as np
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-import pickle
-from tensorflow.keras import backend as K
-from konlpy.tag import Kkma
-import re
-import cv2
-from flask import Flask, Response, jsonify, request
-from flask_socketio import SocketIO, emit
-from flask_cors import CORS
-from db import *
-import tensorflow as tf
-import threading
-import sys
-from konlpy.tag import Hannanum
-from geopy.geocoders import Nominatim
-import random
-from playsound import playsound
 # import torch
 from socketio import Client
 import time
+# sio = Client()
 
+# # 서버 연결
+# sio.connect('http://localhost:5000') 
 
 # SocketIO 클라이언트 초기화
 sio = Client()
@@ -59,10 +40,6 @@ except Exception as e:
 def send_target_update(target):
     print(f"서버에 목표 전송: {target}")
     sio.emit('target_updated', {'target_updated': target})  # 서버에 목표값 전송
-
-def send_target_checked(target):
-    print(f"서버에 target check 전송 : {target}")
-    sio.emit('target_checked',{'target_checked': target})
 
 # 학습된 모델 및 토크나이저 경로
 MODEL_PATH = "./data/speech_intent_model2.keras"
@@ -94,7 +71,6 @@ except Exception as e:
 # 음성 인식 초기화
 recognizer = sr.Recognizer()
 kkma = Kkma()
-
 global target
 
 def respond_yes():
@@ -123,93 +99,40 @@ def create_feedback_wav(text):
 
 # 주어 추출 함수
 def extract_subject_des(text):
-
     try:
-
         # 1단계: 텍스트 정리 (불필요한 어미 제거)
-
         text = re.sub(r"(가자|줘|으로|로|가)$", "", text).strip()
-
-
-
         # 2단계: 숫자와 단위 연결 (띄어쓰기 처리)
-
         text = re.sub(r"(\d+)\s+(번|층|호|출구)", r"\1\2", text)
-
-
-
         # 3단계: 하이픈 연결 (숫자-숫자 형태 유지)
-
         text = re.sub(r"(\d+)\s*-\s*(\d+)", r"\1-\2", text)
-
-
-
         # 4단계: Hannanum 명사 추출
-
         hannanum = Hannanum()
-
         nouns = hannanum.nouns(text)
-
-
-
         # 5단계: 숫자와 단위를 결합
-
         combined_text = " ".join(nouns)
-
         combined_text = re.sub(r"(\d+)(번|층|호|출구)", r"\1\2", combined_text)
-
-
-
-        # 6단계: 불필요한 단어 제거 (텍스트 끝에 남은 '으로', '로' 처리)
-
+        # 6단계: 불필요한 단어 제거 (텍스트 끝에 남은 '으로', '로' 처리
         result = re.sub(r"(으로|로)$", "", combined_text.replace(" ", "")).strip()
-
-
-
         return result if result else None
-
     except Exception as e:
-
         return f"주어 추출 중 오류: {e}"
 
 def extract_subject_hacha(text):
-
     try:
-
         # 1단계: 불필요한 어미 제거
-
         text = re.sub(r"(내려줘|세워줘|멈춰|으로|로|가)$", "", text).strip()
-
-
-
         # 2단계: Hannanum 명사 추출
-
         hannanum = Hannanum()
-
         nouns = hannanum.nouns(text)
-
-
-
         # 3단계: 의미 있는 단어 결합
-
         combined_text = " ".join(nouns)
-
-
-
-        # 4단계: 위치 관련 표현 정리 (띄어쓰기와 불필요한 단어 제거)
-
+        # 4단계: 위치 관련 표현 정리 띄어쓰기와 불필요한 단어 제거)
         combined_text = re.sub(r"(앞|뒤|여기|저기|지금|바로|횡단보도|카페|길|사거리|코너)", r" \1", combined_text)
-
         result = combined_text.replace(" ", "").strip()
-
-
-
         return result if result else None
-
     except Exception as e:
-
         return f"하차 주어 추출 중 오류: {e}"
-
 
 is_robot_called = False
 # 온도 조정된 예측 함수
@@ -247,7 +170,6 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
                 create_feedback_wav(feedback_question)
                  # 질문 출력 및 재생
                 print("목적지가 맞나 확인합니다.")
-                send_target_checked(target)
                 play_feedback_wav()
                 return f"'{text}' -> 예측: {LABEL_DICT.get(predicted_label, '알 수 없음')} (신뢰도: {confidence:.2f}), {label_scores}, 추출된 주어: {subject}"
             
@@ -275,57 +197,29 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
     
 # 음성을 의도로 변환
 def voice_to_intent():
-
     """실시간 음성 인식을 통해 텍스트를 의도로 변환"""
-
     with sr.Microphone() as source:
-
         print("음성 인식 준비 중...")
-
         recognizer.adjust_for_ambient_noise(source, duration=1)
-
         recognizer.pause_threshold = 2.0
-
         print("준비 완료! 말씀하세요 (Ctrl+C로 종료)")
-
-
-
         # while True:  # 지속적으로 음성을 처리하기 위해 반복
-
         try:
-
             print("음성을 기다리는 중...")
-
             audio = recognizer.listen(source, timeout=None)
-
             print("음성을 처리 중입니다...")
-
-
-
             text = recognizer.recognize_google(audio, language="ko-KR")
-
             print(f"인식된 텍스트: {text}")
-
-
-
             prediction = predict_with_temperature_adjustment(text)
-
             print(f"예측 결과: {prediction}")
-
-
-
         except sr.UnknownValueError:
-
             print("음성을 인식할 수 없습니다.")
-
         except KeyboardInterrupt:
-
             print("음성 인식이 중단되었습니다.")
-
         except Exception as e:
-
             print(f"예기치 못한 오류 발생: {e}")
-
+            
+            
 # 실행
 if __name__ == "__main__":
     while True:

@@ -13,7 +13,7 @@ const LiveVideo = () => {
     return (
         <VideoContainer>
             <img 
-                src="http://192.168.0.31:5000/video_feed"
+                src="http://192.168.0.34:5000/video_feed"
                 alt="Live Feed" 
                 style={{ width: 'auto', height: '100%' }} // 너비는 자동, 높이는 100%
             />

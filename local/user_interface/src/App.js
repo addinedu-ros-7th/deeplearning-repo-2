@@ -76,9 +76,7 @@ const App = () => {
                       <Routes>
                           <Route path='manager/taxi/list' element={<TaxiList taxis={taxis} />} />
                           <Route path='user/video' element={<LiveVideo />} />
-                          {/* <Route path='user/driving' element={<KakaoMap />} /> */}
                           <Route path='user/driving' element={<Driving />} />
-                          {/* <Route path='user/2' element={<KakaoMap />} /> */}
                           <Route path='manager/taxi/chart' element={<PieChart />} />
                           <Route path='user/money' element={<UserMoney />} />
                       </Routes>

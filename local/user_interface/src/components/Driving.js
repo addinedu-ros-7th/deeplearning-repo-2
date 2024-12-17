@@ -218,6 +218,7 @@ const Driving = () => {
         console.error("위도를 가져오는 중 오류 발생");
       }
     });
+    console.log(startLon,startLat)
   };
   
   const handleUpdateTarget = () => {
@@ -234,6 +235,7 @@ const Driving = () => {
         console.error("위도를 가져오는 중 오류 발생");
       }
     });
+    console.log(targetLon, targetLat);
   };
   
   const handleCallTaxi = () => {
