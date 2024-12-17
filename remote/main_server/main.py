@@ -19,6 +19,7 @@ from konlpy.tag import Hannanum
 from geopy.geocoders import Nominatim
 import random
 from playsound import playsound
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 # CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
@@ -382,6 +383,69 @@ def random_taxi():
     print(response)
     return jsonify(response)
 
+@app.route('/call_taxi', methods=['POST'])
+def call_taxi():
+    try:
+        data = request.json
+        user_id = data.get('userId')
+        start_point = data.get('startPoint')
+        end_point = data.get('endPoint')
+
+        # 데이터 유효성 검사
+        if not user_id or not start_point or not end_point:
+            return jsonify({'error': '필수 데이터가 누락되었습니다.'}), 400
+
+        # 랜덤으로 사용 가능한 택시 선택 (taxi_id, taxi_type, taxi_license를 포함)
+        query = "SELECT taxi_id, taxi_type, taxi_license FROM taxi WHERE status = true ORDER BY RAND() LIMIT 1"
+        raw_data = execute_query(query)
+
+        if not raw_data:
+            return jsonify({'message': '사용 가능한 택시가 없습니다.'}), 404
+
+        taxi_id, taxi_type, taxi_license = raw_data[0]  # 택시 정보 추출
+        start_time = datetime.now()
+        pred_end_time = start_time + timedelta(minutes=15)
+
+        # charge를 10으로 설정
+        charge = 10
+
+        # 마지막 taxi_operation의 video_path 가져오기
+        video_query = "SELECT video_path FROM taxi_operation ORDER BY to_id DESC LIMIT 1"
+        last_video_data = execute_query(video_query)
+
+        if last_video_data:
+            last_video_path = last_video_data[0][0]  # 마지막 video_path 가져오기
+            # 'video_'와 숫자 부분을 분리
+            base_video_path = last_video_path.rsplit('_', 1)[0]  # 'video_' 부분
+            last_number = int(last_video_path.rsplit('_', 1)[1])  # 마지막 숫자
+            new_number = last_number + 1  # 새로운 숫자 생성
+            new_video_path = f"{base_video_path}_{new_number}"  # 새로운 video_path 생성
+        else:
+            new_video_path = "video_1"  # 첫 번째 비디오가 없을 경우 기본값
+
+        # 택시 호출 기록 저장
+        insert_query = """
+            INSERT INTO taxi_operation (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, video_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        execute_query(insert_query, (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, new_video_path))
+        print(insert_query, (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, new_video_path))
+
+        # 택시 상태 업데이트
+        execute_query("UPDATE taxi SET status = false WHERE taxi_id = %s", (taxi_id,))
+
+        # 응답에 택시 정보 포함
+        return jsonify({
+            'message': '택시 호출 성공',
+            'taxiId': taxi_id,
+            'taxiType': taxi_type,
+            'taxiLicense': taxi_license,
+            'videoPath': new_video_path
+        }), 200
+    except Exception as e:
+        print(f"서버 오류: {e}")
+        return jsonify({'error': '서버에서 오류가 발생했습니다.'}), 500
+
 # 주어 추출 함수
 def extract_subject_des(text):
 
@@ -541,6 +605,8 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
 
                 create_feedback_wav(feedback_question)
 
+                socketio.emit('target_checked', {'target_checked': target})
+
                  # 질문 출력 및 재생
 
                 print("목적지가 맞나 확인합니다.")
@@ -565,7 +631,7 @@ def predict_with_temperature_adjustment(text, threshold=0.7, gap_threshold=0.3, 
 
                 go_des()
 
-                socketio.emit('target_updated', {'target': target})
+                socketio.emit('target_updated', {'target_updated': target})
 
                 is_robot_called = False # 확정되면 상태 초기화 
 
