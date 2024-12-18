@@ -13,6 +13,7 @@ import {
   Button, 
   Input 
 } from './DrivingStyled'; 
+import Map from './Map';
 
 const Driving = () => {
   const dispatch = useDispatch();
@@ -79,16 +80,31 @@ const Driving = () => {
     });
 
     // target updated receive
+    // newSocket.on('target_updated', async (data) => {
+    //   console.log('수신된 목적지:', data.target_updated);
+    //   setTarget(data.target_updated);
+    //   dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
+    //   await getLatLongFromAddress(data.target_updated); // 이곳에서만 호출
+    //   setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
+    //   setActivePopup(null); // 팝업 닫기
+
+    //   await handleUpdateTarget(); // 목적지 위도/경도 업데이트
+    //   setUpdateReady(true); 
+    // });
     newSocket.on('target_updated', async (data) => {
       console.log('수신된 목적지:', data.target_updated);
       setTarget(data.target_updated);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
-      await getLatLongFromAddress(data.target_updated); // 이곳에서만 호출
-      setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
-      setActivePopup(null); // 팝업 닫기
-
-      await handleUpdateTarget(); // 목적지 위도/경도 업데이트
-      setUpdateReady(true); 
+      const coords = await getLatLongFromAddress(data.target_updated);
+      if (coords) {
+        setTargetLat(coords.latitude);
+        setTargetLon(coords.longitude);
+        console.log("좌표 업데이트 완료:", coords);
+        // 좌표가 모두 업데이트된 후 호출
+        handleCallTaxi();
+      } else {
+        console.error("좌표를 가져오는 데 실패했습니다.");
+      }
     });
 
 
@@ -97,26 +113,71 @@ const Driving = () => {
     };
   }, [dispatch]);
 
+  // const getLatLongFromAddress = async (address) => {
+  //   try {
+  //     const response = await fetch('http://localhost:5000/get_lat_long', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ address }),
+  //     });
+  //     const data = await response.json();
+  //     if (data.latitude && data.longitude) {
+  //       return { latitude: data.latitude, longitude: data.longitude }; // 위도와 경도를 반환
+  //     } else {
+  //       console.error('위도와 경도를 가져오는 중 오류 발생:', data.error);
+  //     }
+  //   } catch (error) {
+  //     console.error('API 호출 중 오류 발생:', error);
+  //   }
+  // };
   const getLatLongFromAddress = async (address) => {
     try {
-      const response = await fetch('http://localhost:5000/get_lat_long', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ address }),
-      });
-      const data = await response.json();
-      if (data.latitude && data.longitude) {
-        return { latitude: data.latitude, longitude: data.longitude }; // 위도와 경도를 반환
-      } else {
-        console.error('위도와 경도를 가져오는 중 오류 발생:', data.error);
+      // 1단계: 주소 검색 시도
+      let response = await fetch(
+        `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`,
+        {
+          headers: {
+            Authorization: `KakaoAK fa9b778e6585289e190dc4ca50d395ed`,
+          },
+        }
+      );
+  
+      let data = await response.json();
+  
+      // 주소 검색 결과가 있으면 반환
+      if (data.documents && data.documents.length > 0) {
+        const { x, y } = data.documents[0]; // 경도(x), 위도(y)
+        return { latitude: parseFloat(y), longitude: parseFloat(x) };
       }
+  
+      // 2단계: 키워드 검색 시도 (주소 검색 실패 시)
+      response = await fetch(
+        `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(address)}`,
+        {
+          headers: {
+            Authorization: `KakaoAK fa9b778e6585289e190dc4ca50d395ed`,
+          },
+        }
+      );
+  
+      data = await response.json();
+  
+      if (data.documents && data.documents.length > 0) {
+        const { x, y } = data.documents[0];
+        return { latitude: parseFloat(y), longitude: parseFloat(x) };
+      }
+  
+      // 검색 결과가 모두 없을 경우
+      console.error("검색 결과가 없습니다:", data);
+      alert("주소를 찾을 수 없습니다. 정확한 장소명을 입력해주세요.");
     } catch (error) {
-      console.error('API 호출 중 오류 발생:', error);
+      console.error("API 호출 중 오류 발생:", error);
+      alert("위치 정보를 가져오는 데 문제가 발생했습니다. 다시 시도해주세요.");
     }
   };
-
+  
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -221,40 +282,59 @@ const Driving = () => {
   
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const handleUpdateStartLocation = async () => {
-      setStartLocation(newStartLocation); // 새로운 출발지 설정
-      dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
+  // const handleUpdateStartLocation = async () => {
+  //     setStartLocation(newStartLocation); // 새로운 출발지 설정
+  //     dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
 
-      // 새로운 출발지의 위도와 경도를 가져옵니다.
-      const coords = await getLatLongFromAddress(newStartLocation);
-      if (coords) {
-          setStartLat(coords.latitude); // 새로운 출발지 위도 설정
-          setStartLon(coords.longitude); // 새로운 출발지 경도 설정
-          console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-          // 상태 업데이트가 반영될 시간을 기다립니다.
-          await delay(100); // 필요한 만큼의 딜레이를 조정
-      } else {
-          console.error("위도를 가져오는 중 오류 발생");
-          throw new Error("출발지 위도/경도 오류");
-      }
+  //     // 새로운 출발지의 위도와 경도를 가져옵니다.
+  //     const coords = await getLatLongFromAddress(newStartLocation);
+  //     if (coords) {
+  //         setStartLat(coords.latitude); // 새로운 출발지 위도 설정
+  //         setStartLon(coords.longitude); // 새로운 출발지 경도 설정
+  //         console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+  //         // 상태 업데이트가 반영될 시간을 기다립니다.
+  //         await delay(100); // 필요한 만큼의 딜레이를 조정
+  //     } else {
+  //         console.error("위도를 가져오는 중 오류 발생");
+  //         throw new Error("출발지 위도/경도 오류");
+  //     }
+  // };
+
+  // const handleUpdateTarget = async () => {
+  //     setTarget(newTarget); // 새로운 목적지 설정
+  //     dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
+
+  //     // 새로운 목적지의 위도와 경도를 가져옵니다.
+  //     const coords = await getLatLongFromAddress(newTarget);
+  //     if (coords) {
+  //         setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
+  //         setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
+  //         console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
+  //         // 상태 업데이트가 반영될 시간을 기다립니다.
+  //         await delay(100); // 필요한 만큼의 딜레이를 조정
+  //     } else {
+  //         console.error("위도를 가져오는 중 오류 발생");
+  //         throw new Error("목적지 위도/경도 오류");
+  //     }
+  // };
+  const handleUpdateStartLocation = async () => {
+    // 새로운 출발지의 위도와 경도를 가져옵니다.
+    const coords = await getLatLongFromAddress(newStartLocation);
+    if (coords) {
+      setStartLat(coords.latitude);
+      setStartLon(coords.longitude);
+      setStartCoords(new window.kakao.maps.LatLng(coords.latitude, coords.longitude)); // 출발지 좌표 설정
+    }
   };
 
   const handleUpdateTarget = async () => {
-      setTarget(newTarget); // 새로운 목적지 설정
-      dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
-
-      // 새로운 목적지의 위도와 경도를 가져옵니다.
-      const coords = await getLatLongFromAddress(newTarget);
-      if (coords) {
-          setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
-          setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
-          console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-          // 상태 업데이트가 반영될 시간을 기다립니다.
-          await delay(100); // 필요한 만큼의 딜레이를 조정
-      } else {
-          console.error("위도를 가져오는 중 오류 발생");
-          throw new Error("목적지 위도/경도 오류");
-      }
+    // 새로운 목적지의 위도와 경도를 가져옵니다.
+    const coords = await getLatLongFromAddress(newTarget);
+    if (coords) {
+      setTargetLat(coords.latitude);
+      setTargetLon(coords.longitude);
+      setTargetCoords(new window.kakao.maps.LatLng(coords.latitude, coords.longitude)); // 목적지 좌표 설정
+    }
   };
 
   useEffect(() => {
@@ -291,12 +371,18 @@ const Driving = () => {
       </RouteLabel>
       <MapContainer>
         {kakaoLoaded && startCoords && targetCoords && (
-          <KakaoMap 
-            startCoords={startCoords} 
-            targetCoords={targetCoords} 
-            route={route} 
-            startLocation={startLocation} // 출발지 정보 추가
-            target={target} // 목적지 정보 추가
+          // <KakaoMap 
+          //   startCoords={startCoords} 
+          //   targetCoords={targetCoords} 
+          //   route={route} 
+          //   startLocation={startLocation} // 출발지 정보 추가
+          //   target={target} // 목적지 정보 추가
+          // />
+          <Map
+            startCoords={startCoords}
+            targetCoords={targetCoords}
+            startLocation={startLocation}
+            target={target} 
           />
         )}
       </MapContainer>
