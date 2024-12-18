@@ -67,27 +67,30 @@ const Driving = () => {
       newSocket.emit('request_target');  // 서버에 목적지 요청
     });
 
-    // target checked receivce
+    // target checked receive
     newSocket.on('target_checked', (data) => {
       console.log('목적지 확인:', data.target_checked);
       setIsTargetChecked(true);
       setTarget(data.target_checked);
       setTargetCheckMessage(`${data.target_checked}가 맞습니까?`);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_checked });
-      getLatLongFromAddress(data.target_checked);
       setNewTarget(data.target_checked); // 입력 박스에 현재 목표 설정
       setActivePopup('target'); // 목적지 설정 팝업 열기
     });
 
-    // target update receivce
+    // target updated receive
     newSocket.on('target_updated', async (data) => {
       console.log('수신된 목적지:', data.target_updated);
       setTarget(data.target_updated);
       dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
-      await getLatLongFromAddress(data.target_updated);
+      await getLatLongFromAddress(data.target_updated); // 이곳에서만 호출
       setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
       setActivePopup(null); // 팝업 닫기
+
+      await handleUpdateTarget(); // 목적지 위도/경도 업데이트
+      setUpdateReady(true); 
     });
+
 
     return () => {
       newSocket.disconnect();
@@ -216,40 +219,6 @@ const Driving = () => {
     }
   };
   
-  // const handleUpdateStartLocation = () => {
-  //   // 출발지 업데이트
-  //   setStartLocation(newStartLocation); // 새로운 출발지 설정
-  //   dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
-    
-  //   // 새로운 출발지의 위도와 경도를 가져옵니다.
-  //   getLatLongFromAddress(newStartLocation).then((coords) => {
-  //     if (coords) {
-  //       setStartLat(coords.latitude); // 새로운 출발지 위도 설정
-  //       setStartLon(coords.longitude); // 새로운 출발지 경도 설정
-  //       console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-  //     } else {
-  //       console.error("위도를 가져오는 중 오류 발생");
-  //     }
-  //   });
-  // };
-  
-  // const handleUpdateTarget = () => {
-  //   // 목적지 업데이트
-  //   setTarget(newTarget); // 새로운 목적지 설정
-  //   dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
-    
-  //   // 새로운 목적지의 위도와 경도를 가져옵니다.
-  //   getLatLongFromAddress(newTarget).then((coords) => {
-  //     if (coords) {
-  //       setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
-  //       setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
-  //       console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-  //       handleCallTaxi();
-  //     } else {
-  //       console.error("위도를 가져오는 중 오류 발생");
-  //     }
-  //   });
-  // };
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const handleUpdateStartLocation = async () => {
