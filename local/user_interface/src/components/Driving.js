@@ -11,16 +11,19 @@ import {
   Popup, 
   Overlay, 
   Button, 
-  Input 
+  Input,
+  TaxiPopup
 } from './DrivingStyled'; 
 import Map from './Map';
+
+// 1 호출하기 눌러야 맵 뜨는 것
+// 3. 하차하기
 
 const Driving = () => {
   const dispatch = useDispatch();
   const [target, setTarget] = useState('');
-  const [startLocation, setStartLocation] = useState('');
-  const [startLat, setStartLat] = useState(null);
   const [startLon, setStartLon] = useState(null);
+  const [startLat, setStartLat] = useState(null);
   const [targetLat, setTargetLat] = useState(null);
   const [targetLon, setTargetLon] = useState(null);
   const [route, setRoute] = useState([]); // 경로 상태 추가
@@ -29,6 +32,7 @@ const Driving = () => {
   const [activePopup, setActivePopup] = useState(null);
   const [socket, setSocket] = useState(null);
   const [newTarget, setNewTarget] = useState('목적지를 설정해주세요.');
+  const [startLocation, setStartLocation] = useState('');
   const [newStartLocation, setNewStartLocation] = useState('');
   const [targetCheckMessage, setTargetCheckMessage] = useState('');
   const [taxiInfo, setTaxiInfo] = useState(null);
@@ -79,18 +83,6 @@ const Driving = () => {
       setActivePopup('target'); // 목적지 설정 팝업 열기
     });
 
-    // target updated receive
-    // newSocket.on('target_updated', async (data) => {
-    //   console.log('수신된 목적지:', data.target_updated);
-    //   setTarget(data.target_updated);
-    //   dispatch({ type: 'UPDATE_TARGET', payload: data.target_updated });
-    //   await getLatLongFromAddress(data.target_updated); // 이곳에서만 호출
-    //   setNewTarget(data.target_updated); // 입력 박스에 현재 목표 설정
-    //   setActivePopup(null); // 팝업 닫기
-
-    //   await handleUpdateTarget(); // 목적지 위도/경도 업데이트
-    //   setUpdateReady(true); 
-    // });
     newSocket.on('target_updated', async (data) => {
       console.log('수신된 목적지:', data.target_updated);
       setTarget(data.target_updated);
@@ -113,25 +105,6 @@ const Driving = () => {
     };
   }, [dispatch]);
 
-  // const getLatLongFromAddress = async (address) => {
-  //   try {
-  //     const response = await fetch('http://localhost:5000/get_lat_long', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ address }),
-  //     });
-  //     const data = await response.json();
-  //     if (data.latitude && data.longitude) {
-  //       return { latitude: data.latitude, longitude: data.longitude }; // 위도와 경도를 반환
-  //     } else {
-  //       console.error('위도와 경도를 가져오는 중 오류 발생:', data.error);
-  //     }
-  //   } catch (error) {
-  //     console.error('API 호출 중 오류 발생:', error);
-  //   }
-  // };
   const getLatLongFromAddress = async (address) => {
     try {
       // 1단계: 주소 검색 시도
@@ -282,41 +255,6 @@ const Driving = () => {
   
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-  // const handleUpdateStartLocation = async () => {
-  //     setStartLocation(newStartLocation); // 새로운 출발지 설정
-  //     dispatch({ type: 'UPDATE_START_LOCATION', payload: newStartLocation });
-
-  //     // 새로운 출발지의 위도와 경도를 가져옵니다.
-  //     const coords = await getLatLongFromAddress(newStartLocation);
-  //     if (coords) {
-  //         setStartLat(coords.latitude); // 새로운 출발지 위도 설정
-  //         setStartLon(coords.longitude); // 새로운 출발지 경도 설정
-  //         console.log(`출발지: ${newStartLocation}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-  //         // 상태 업데이트가 반영될 시간을 기다립니다.
-  //         await delay(100); // 필요한 만큼의 딜레이를 조정
-  //     } else {
-  //         console.error("위도를 가져오는 중 오류 발생");
-  //         throw new Error("출발지 위도/경도 오류");
-  //     }
-  // };
-
-  // const handleUpdateTarget = async () => {
-  //     setTarget(newTarget); // 새로운 목적지 설정
-  //     dispatch({ type: 'UPDATE_TARGET', payload: newTarget });
-
-  //     // 새로운 목적지의 위도와 경도를 가져옵니다.
-  //     const coords = await getLatLongFromAddress(newTarget);
-  //     if (coords) {
-  //         setTargetLat(coords.latitude); // 새로운 목적지 위도 설정
-  //         setTargetLon(coords.longitude); // 새로운 목적지 경도 설정
-  //         console.log(`목적지: ${newTarget}, 위도: ${coords.latitude}, 경도: ${coords.longitude}`);
-  //         // 상태 업데이트가 반영될 시간을 기다립니다.
-  //         await delay(100); // 필요한 만큼의 딜레이를 조정
-  //     } else {
-  //         console.error("위도를 가져오는 중 오류 발생");
-  //         throw new Error("목적지 위도/경도 오류");
-  //     }
-  // };
   const handleUpdateStartLocation = async () => {
     // 새로운 출발지의 위도와 경도를 가져옵니다.
     const coords = await getLatLongFromAddress(newStartLocation);
@@ -355,20 +293,47 @@ const Driving = () => {
     try {
       await handleUpdateStartLocation();
       await handleUpdateTarget();
+      setTarget(newTarget);
       setUpdateReady(true);
     } catch (error) {
       console.log('hondleCallButton error :',error);
     }
   }
 
+  const handleDropTaxi = async (taxiId) => {
+    try {
+      const response = await fetch('http://localhost:5000/drop_taxi', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taxiId }),
+      });
+  
+      if (response.ok) {
+        const data = await response.json();
+        alert(data.message); // 하차 완료 메시지 표시
+        setTaxiInfo(null); // 택시 정보 초기화
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || '하차 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('API 호출 중 오류 발생:', error);
+      alert('하차 요청 중 오류가 발생했습니다.');
+    }
+  };
+  
+
   return (
     <Container>
       <Header>
+        <h2>출발지: {startLocation} | 목적지: {target}</h2>
         <Button onClick={() => setActivePopup('target')}>목적지 설정</Button>
       </Header>
-      <RouteLabel>
+      {/* <RouteLabel>
         {startLocation && target ? `${startLocation} -> ${target}` : ''}
-      </RouteLabel>
+      </RouteLabel> */}
       <MapContainer>
         {kakaoLoaded && startCoords && targetCoords && (
           // <KakaoMap 
@@ -440,6 +405,18 @@ const Driving = () => {
             <Button onClick={() => setActivePopup(null)}>닫기</Button>
           </Popup>
         </>
+      )}
+
+      {taxiInfo && (
+        <TaxiPopup>
+          <h2>택시 배차 정보</h2>
+          <p>택시 ID: {taxiInfo.taxiId}</p>
+          <p>택시 종류: {taxiInfo.taxiType}</p>
+          <p>택시 라이센스: {taxiInfo.taxiLicense}</p>
+          <Button 
+            style={{ backgroundColor: 'red', color: 'white' }} 
+            onClick={() => handleDropTaxi(taxiInfo.taxiId)}>하차하기</Button>
+        </TaxiPopup>
       )}
     </Container>
   );  

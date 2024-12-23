@@ -46,7 +46,8 @@ const TaxiList = ({ taxis }) => {
                     <TableCell>Distance</TableCell>
                     <TableCell>Charge</TableCell>
                     <TableCell>Start Location</TableCell>
-                    <TableCell>Destination</TableCell>
+                    <TableCell>Start Point</TableCell>  
+                    <TableCell>End Point</TableCell>  
                 </TableHeader>
                 {taxis.length > 0 ? (
                     taxis.map(taxi => (
@@ -59,12 +60,13 @@ const TaxiList = ({ taxis }) => {
                             <TableCell>{taxi.distance}</TableCell>
                             <TableCell>{taxi.charge}</TableCell>
                             <TableCell>{taxi.start_location}</TableCell>
-                            <TableCell>{taxi.destination}</TableCell>
+                            <TableCell>{taxi.start_point}</TableCell> 
+                            <TableCell>{taxi.end_point}</TableCell>
                         </TableRow>
                     ))
                 ) : (
                     <TableRow>
-                        <TableCell colSpan={9}>No taxis found.</TableCell>
+                        <TableCell colSpan={11}>No taxis found.</TableCell>
                     </TableRow>
                 )}
             </Table>

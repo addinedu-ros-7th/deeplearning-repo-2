@@ -106,12 +106,14 @@ const SearchHeader = ({ onSearch }) => {
     const [searchValue, setSearchValue] = useState('');
     const [taxiList, setTaxiList] = useState([]);
     const [showPopup, setShowPopup] = useState(false);
+    const [searchByTaxiId, setSearchByTaxiId] = useState(false); // 체크박스 상태 추가
 
     const handleSearch = () => {
         const criteria = {
             startDate,
             endDate,
             searchValue,
+            searchByTaxiId, // 체크박스 상태 포함
         };
         onSearch(criteria);
     };
@@ -151,9 +153,18 @@ const SearchHeader = ({ onSearch }) => {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
             />
-            <Spacer /> {/* Spacer를 추가하여 간격을 둡니다. */}
+            <Spacer />
+            <label>
+                <input
+                    type="checkbox"
+                    checked={searchByTaxiId}
+                    onChange={() => setSearchByTaxiId(!searchByTaxiId)}
+                />
+                taxi_id로 검색
+            </label>
+            <Spacer />
             <Button onClick={handleSearch}>검색</Button>
-            <Spacer /> {/* Spacer를 추가하여 간격을 둡니다. */}
+            <Spacer />
             <Button onClick={fetchTaxiList}>택시 차량번호 리스트</Button>
 
             {showPopup && (

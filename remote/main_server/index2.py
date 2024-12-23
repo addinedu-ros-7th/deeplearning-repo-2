@@ -18,7 +18,6 @@ import torch
 import requests
 
 app = Flask(__name__)
-# CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app,cors_allowed_origins="*")
 KAKAO_REST_API_KEY = "fa9b778e6585289e190dc4ca50d395ed"
@@ -27,133 +26,6 @@ KAKAO_REST_API_KEY = "fa9b778e6585289e190dc4ca50d395ed"
 global target
 cap = None
 
-# def initialize_camera():
-#     global cap
-#     global target
-#     cap = cv2.VideoCapture(2)
-#     target = None
-    
-# def generate_frames():
-#     global cap
-#     if cap is None:
-#         initialize_camera()
-
-#     while True:
-#         success, frame = cap.read()
-#         if not success:
-#             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-#             continue
-
-#         _, buffer = cv2.imencode('.jpg', frame)
-#         frame_data = buffer.tobytes()
-
-#         yield (b'--frame\r\n'
-#                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-
-# # YOLO 모델 경로
-# MODEL_PATH_YOLO = "/home/dw/ws/git_ws/deeplearning-repo-2/remote/main_server/data/traffic_light_best.pt"
-
-# # 모델 로딩 (CPU로 변경)
-# model_yolo = YOLO(MODEL_PATH_YOLO)
-
-# def initialize_camera():
-#     global cap
-#     global target
-#     cap = cv2.VideoCapture(2)  # 카메라 인덱스 확인 필요
-#     target = None
-
-# def generate_frames():
-#     global cap
-#     if cap is None:
-#         initialize_camera()
-
-#     while True:
-#         success, frame = cap.read()
-#         if not success:
-#             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-#             continue
-#         # #BGR -> RGB 변환
-#         # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-#         # # YOLO 추론
-#         # results = model_yolo.predict(frame_rgb)
-#         results = model_yolo.predict(frame)
-#         # 결과 체크 후 plot
-#         if len(results) > 0:
-#             annotated_frame = results[0].plot()
-#         else:
-#             # 검출 없는 경우 원본 프레임 사용
-#             annotated_frame = frame
-#         # JPG 인코딩
-#         _, buffer = cv2.imencode('.jpg', annotated_frame)
-#         frame_data = buffer.tobytes()
-
-#         # YIELD로 이미지 바이너리 스트림 반환
-#         yield (b'--frame\r\n'
-#                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-        
-        
-# # YOLO 모델 경로
-# MODEL_PATH_YOLO_2 = "/home/dw/ws/git_ws/deeplearning-repo-2/remote/main_server/data/traffic_light_90000.pt"
-# MODEL_PATH_YOLO_1 = "/home/dw/ws/git_ws/deeplearning-repo-2/remote/main_server/data/traffic_sign.pt"
-
-# # GPU 확인
-# if torch.cuda.is_available():
-#     print("GPU 사용 가능:", torch.cuda.get_device_name(0))
-# else:
-#     print("GPU를 사용할 수 없습니다. CPU로 실행됩니다.")
-
-# # 모델 로딩 (CPU 사용)
-# model_yolo_1 = YOLO(MODEL_PATH_YOLO_1)
-# model_yolo_2 = YOLO(MODEL_PATH_YOLO_2)
-# print("YOLO 모델 1 실행 장치:", model_yolo_1.device)
-# print("YOLO 모델 2 실행 장치:", model_yolo_2.device)
-# # 비디오 파일 경로
-# VIDEO_PATH = "/home/dw/ws/git_ws/deeplearning-repo-2/remote/main_server/data/drive_video_1_1.mp4"
-
-# def initialize_camera():
-#     global cap
-#     cap = cv2.VideoCapture(VIDEO_PATH)  # MP4 파일 사용
-
-# def generate_frames():
-#     global cap
-#     if cap is None:
-#         initialize_camera()
-
-#     frame_skip = 2  # 프레임 스킵
-#     frame_count = 0
-
-#     while True:
-#         success, frame = cap.read()
-#         if not success:
-#             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-#             continue
-
-#         frame_count += 1
-#         if frame_count % frame_skip != 0:
-#             # 스킵된 프레임은 원본 그대로 전달
-#             _, buffer = cv2.imencode('.jpg', frame)
-#             frame_data = buffer.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-#             continue
-
-#         # YOLO 추론
-#         results1 = model_yolo_1.predict(frame, verbose=False)
-#         results2 = model_yolo_2.predict(frame, verbose=False)
-
-#         # 결과 병합
-#         combined_frame = frame.copy()  # 원본 프레임 복사
-#         if len(results1) > 0:
-#             combined_frame = results1[0].plot(combined_frame)
-#         if len(results2) > 0:
-#             combined_frame = results2[0].plot(combined_frame)
-
-#         # JPG 인코딩
-#         _, buffer = cv2.imencode('.jpg', combined_frame)
-#         frame_data = buffer.tobytes()
-
-#         yield (b'--frame\r\n'
-#                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
 def check_gpu():
     # GPU 확인
     if torch.cuda.is_available():
@@ -168,69 +40,77 @@ MODEL_PATH_YOLO_2 = "./data/traffic_light_90000.pt"
 # GPU 확인
 check_gpu()
 
+cap = None
+last_frame = None
+
 # YOLO 모델 로드
+MODEL_PATH_YOLO_1 = "./data/traffic_sign.pt"
+MODEL_PATH_YOLO_2 = "./data/traffic_light_90000.pt"
+
 model_yolo_1 = YOLO(MODEL_PATH_YOLO_1)  # 교통 표지판 모델
 model_yolo_2 = YOLO(MODEL_PATH_YOLO_2)  # 신호등 모델
-print("YOLO 모델 1 실행 장치:", model_yolo_1.device)
-print("YOLO 모델 2 실행 장치:", model_yolo_2.device)
-
-# 비디오 파일 경로 설정
-VIDEO_PATH = "./data/drive_video_1_1.mp4"
 
 def initialize_camera():
-    # 비디오 파일 불러오기
-    cap = cv2.VideoCapture(VIDEO_PATH)
+    """카메라 초기화"""
+    global cap
+    if cap is None:
+        cap = cv2.VideoCapture(0)  # 카메라 열기
     if not cap.isOpened():
-        print("Error: 비디오 파일을 열 수 없습니다.")
+        print("Error: 카메라를 열 수 없습니다.")
         exit()
-    return cap
+
+def read_frame():
+    """프레임 읽기"""
+    global cap, last_frame
+    if cap is None:
+        initialize_camera()
+    
+    success, frame = cap.read()
+    if success:
+        last_frame = frame.copy()  # 성공적으로 읽은 프레임 저장
+    return last_frame
+
+def process_frame_with_yolo(frame):
+    """YOLO 모델로 프레임 처리"""
+    combined_frame = frame.copy()
+
+    # YOLO 모델 1 결과 처리 (교통 표지판)
+    results1 = model_yolo_1(frame, conf=0.4, iou=0.35, verbose=False)
+    if results1 and results1[0].boxes is not None:
+        for box in results1[0].boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            label = f"{results1[0].names[int(box.cls[0])]} {box.conf[0]:.2f}"
+            cv2.rectangle(combined_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(combined_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+    # YOLO 모델 2 결과 처리 (신호등)
+    results2 = model_yolo_2(frame, conf=0.4, iou=0.35, verbose=False)
+    if results2 and results2[0].boxes is not None:
+        for box in results2[0].boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            label = f"{results2[0].names[int(box.cls[0])]} {box.conf[0]:.2f}"
+            cv2.rectangle(combined_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(combined_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+    return combined_frame
 
 def generate_frames():
-    cap = initialize_camera()
-    frame_skip = 2  # 프레임 스킵 비율
-    frame_count = 0
-
+    """클라이언트에게 프레임 스트리밍"""
     while True:
-        success, frame = cap.read()
-        if not success:  # 비디오 끝에서 다시 시작
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        frame = read_frame()  # 전역적으로 관리되는 프레임 읽기
+        if frame is None:
             continue
 
-        frame_count += 1
-        if frame_count % frame_skip != 0:
-            # 프레임 스킵 적용
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_data = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-            continue
-
-        # 두 YOLO 모델로 프레임 처리
-        results1 = model_yolo_1(frame, conf=0.4, iou=0.35, verbose=False)
-        results2 = model_yolo_2(frame, conf=0.4, iou=0.35, verbose=False)
-
-        # 결과 병합 및 시각화
-        combined_frame = frame.copy()
-        if results1 and results1[0].boxes is not None:
-            for box in results1[0].boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                label = f"{results1[0].names[int(box.cls[0])]} {box.conf[0]:.2f}"
-                cv2.rectangle(combined_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(combined_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-        if results2 and results2[0].boxes is not None:
-            for box in results2[0].boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                label = f"{results2[0].names[int(box.cls[0])]} {box.conf[0]:.2f}"
-                cv2.rectangle(combined_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                cv2.putText(combined_frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        # YOLO 모델 처리
+        processed_frame = process_frame_with_yolo(frame)
 
         # JPG 인코딩
-        _, buffer = cv2.imencode('.jpg', combined_frame)
+        _, buffer = cv2.imencode('.jpg', processed_frame)
         frame_data = buffer.tobytes()
+        
+        # HTTP 스트림 형식으로 반환
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-
     
 from gtts import gTTS
 
@@ -283,12 +163,15 @@ def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/select_data', methods=['POST']) # need select query changed
+@app.route('/select_data', methods=['POST'])
 def get_data():
     criteria = request.json
     start_date = criteria.get('startDate')
     end_date = criteria.get('endDate')
     search_value = criteria.get('searchValue')
+    search_by_taxi_id = criteria.get('searchByTaxiId')  # 체크박스 상태
+
+    print(search_by_taxi_id, search_value)
 
     query = """
     SELECT 
@@ -300,7 +183,9 @@ def get_data():
         taxi_operation.distance AS distance,
         taxi_operation.charge AS charge,
         taxi_operation.video_path AS start_location,
-        taxi_operation.target AS destination
+        taxi_operation.start_point AS start_point,  -- start_point 추가
+        taxi_operation.end_point AS end_point,      -- end_point 추가
+        taxi_operation.end_point AS destination       -- destination 추가
     FROM 
         taxi_operation
     JOIN 
@@ -310,30 +195,50 @@ def get_data():
     """
 
     params = []
+    
     if not start_date and not end_date and not search_value:
         query += ""
     else:
         query += "WHERE 1=1 "
+        
         if start_date and end_date:
             query += "AND taxi_operation.start_time BETWEEN %s AND %s "
             params += [start_date, end_date]
+
         if search_value:
-            query += "AND (taxi.taxi_id LIKE %s OR users.username LIKE %s OR users.phone_number LIKE %s) "
-            params += [f"%{search_value}%", f"%{search_value}%", f"%{search_value}%"]
+            if search_by_taxi_id:
+                # taxi_id로만 검색
+                query += "AND taxi.taxi_id LIKE %s "
+                params.append(f"%{search_value}%")
+            else:
+                # 모든 컬럼에 대해 검색
+                query += "AND ("
+                query += "taxi.taxi_id LIKE %s OR "
+                query += "users.username LIKE %s OR "
+                query += "users.phone_number LIKE %s OR "
+                query += "taxi_operation.distance LIKE %s OR "
+                query += "taxi_operation.charge LIKE %s OR "
+                query += "taxi_operation.video_path LIKE %s OR "
+                query += "taxi_operation.start_point LIKE %s OR "  # start_point 추가
+                query += "taxi_operation.end_point LIKE %s"  # end_point 추가
+                query += ") "
+                params += [f"%{search_value}%"] * 8  # 모든 검색 조건에 대해 search_value 사용
 
     raw_data = execute_query(query, params)
-
+    print(raw_data)
     data = [
         {
             "taxi_id": row[0],
             "username": row[1],
             "phone_number": row[2],
             "start_time": row[3].isoformat(),
-            "end_time": row[4].isoformat(),
+            "end_time": row[4].isoformat() if row[4] else None,
             "distance": row[5],
             "charge": row[6],
             "start_location": row[7],
-            "destination": row[8]
+            "start_point": row[8],  # start_point 반환
+            "end_point": row[9],    # end_point 반환
+            "destination": row[10]   # destination 반환
         }
         for row in raw_data
     ]
@@ -522,70 +427,6 @@ def random_taxi():
     print(response)
     return jsonify(response)
 
-# @app.route('/call_taxi', methods=['POST'])
-# def call_taxi():
-#     try:
-#         data = request.json
-#         user_id = data.get('userId')
-#         start_point = data.get('startPoint')
-#         end_point = data.get('endPoint')
-
-#         # 데이터 유효성 검사
-#         if not user_id or not start_point or not end_point:
-#             return jsonify({'error': '필수 데이터가 누락되었습니다.'}), 400
-
-#         # 랜덤으로 사용 가능한 택시 선택 (taxi_id, taxi_type, taxi_license를 포함)
-#         query = "SELECT taxi_id, taxi_type, taxi_license FROM taxi WHERE status = true ORDER BY RAND() LIMIT 1"
-#         raw_data = execute_query(query)
-
-#         if not raw_data:
-#             return jsonify({'message': '사용 가능한 택시가 없습니다.'}), 404
-
-#         taxi_id, taxi_type, taxi_license = raw_data[0]  # 택시 정보 추출
-#         # print(raw_data[0])
-#         start_time = datetime.now()
-#         pred_end_time = start_time + timedelta(minutes=15)
-
-#         # charge를 10으로 설정
-#         charge = 10
-
-#         # 마지막 taxi_operation의 video_path 가져오기
-#         video_query = "SELECT video_path FROM taxi_operation ORDER BY to_id DESC LIMIT 1"
-#         last_video_data = execute_query(video_query)
-#         print(last_video_data[0][0])
-
-#         if last_video_data:
-#             last_video_path = last_video_data[0][0]  # 마지막 video_path 가져오기
-#             # 'video_'와 숫자 부분을 분리
-#             base_video_path = last_video_path.rsplit('_', 1)[0]  # 'video_' 부분
-#             last_number = int(last_video_path.rsplit('_', 1)[1])  # 마지막 숫자
-#             new_number = last_number + 1  # 새로운 숫자 생성
-#             new_video_path = f"{base_video_path}_{new_number}"  # 새로운 video_path 생성
-#         else:
-#             new_video_path = "video_1"  # 첫 번째 비디오가 없을 경우 기본값
-
-#         # 택시 호출 기록 저장
-#         insert_query = """
-#             INSERT INTO taxi_operation (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, video_path)
-#             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-#         """
-#         execute_query(insert_query, (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, new_video_path))
-#         print(insert_query, (taxi_id, user_id, start_time, pred_end_time, start_point, end_point, charge, new_video_path))
-
-#         # # 택시 상태 업데이트
-#         # execute_query("UPDATE taxi SET status = false WHERE taxi_id = %s", (taxi_id,))
-
-#         # 응답에 택시 정보 포함
-#         return jsonify({
-#             'message': '택시 호출 성공',
-#             'taxiId': taxi_id,
-#             'taxiType': taxi_type,
-#             'taxiLicense': taxi_license,
-#             'videoPath': new_video_path
-#         }), 200
-#     except Exception as e:
-#         print(f"서버 오류: {e}")
-#         return jsonify({'error': '서버에서 오류가 발생했습니다.'}), 500
 @app.route('/call_taxi', methods=['POST'])
 def call_taxi():
     try:
@@ -637,6 +478,36 @@ def call_taxi():
     except Exception as e:
         print(f"서버 오류: {e}")
         return jsonify({'error': '서버에서 오류가 발생했습니다.'}), 500
+
+# 택시 하차
+@app.route('/drop_taxi', methods=['POST'])
+def drop_taxi():
+    data = request.json
+    taxi_id = data['taxiId']
+    
+    # 현재 시간을 end_time으로 설정
+    end_time = datetime.now()
+
+    try:
+        # 택시 상태를 0으로 업데이트 (하차)
+        update_taxi_query = "UPDATE taxi SET status = 0 WHERE taxi_id = %s"
+        execute_query(update_taxi_query, (taxi_id,))
+
+        # 택시의 마지막 운행 정보를 업데이트 (end_time)
+        update_operation_query = """
+            UPDATE taxi_operation 
+            SET end_time = %s 
+            WHERE taxi_id = %s AND end_time IS NULL
+            ORDER BY start_time DESC 
+            LIMIT 1
+        """
+        execute_query(update_operation_query, (end_time, taxi_id))
+
+        return jsonify({"message": "택시 하차 완료."}), 200
+    except Exception as e:
+        print(f"서버 오류: {e}")
+        return jsonify({"error": "하차 중 오류가 발생했습니다."}), 500
+
     
 # voice2.py에서 목표 값 수신
 @socketio.on('target_updated')
@@ -663,15 +534,5 @@ def handle_checked_target(data):
     socketio.emit('target_checked', {'target_checked': target})
     print(target)
 
-
-# def run_voice_recognition():
-#     while True:
-#         voice_to_intent()
-
-# def run_flask_server():
-    # app.run(host='0.0.0.0', port=5000, debug=True)
-
 if __name__ == '__main__':
-    # threading.Thread(target=run_voice_recognition, daemon=True).start()
-    # run_flask_server()
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
