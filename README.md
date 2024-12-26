@@ -78,6 +78,9 @@
 # Demostraction
 ## 객체 인식
 ![image](https://github.com/user-attachments/assets/4620d91c-aaad-4b23-874f-21baeb0ab823)
+![src_test1_1_1_1_1](https://github.com/user-attachments/assets/c238c3b6-e01c-44bb-bcf7-8b08545705b4)
+
+
 
 ## 장애물 회피
 **• 정적 장애물**
