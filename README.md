@@ -92,4 +92,17 @@
 
 ## 동작 시나리오
 **1. 택시 호출**
-<hr/>
+
+**2. 택시 주행**
+
+**• Inside of Driving**
+
+![final_2](https://github.com/user-attachments/assets/89ce6543-2b84-4864-a7d2-5d3b4610d48f)
+
+**• Outside of Driving**
+
+![20241226_162147](https://github.com/user-attachments/assets/3aa1d6fd-171f-48c8-bcbb-800c3a23b502)
+
+
+**3. 택시 하차**
+
