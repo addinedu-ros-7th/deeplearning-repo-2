@@ -19,10 +19,11 @@
 ## 1.4 Tech
 | 구분 |	상세 |
 |:----------:|:----------:|
-| 개발환경 | 가 | 
-| DB | | 
-| ComputerVision | |   
-| 협업 | |    
+| 개발환경 | ![image](https://github.com/user-attachments/assets/eac1b71b-520e-47e9-b848-03790be10727)  | 
+| 개발언어 | ![python](https://github.com/user-attachments/assets/5dc96c07-3ac5-4010-aadd-c4a67074f0c5) |
+| 개발도구 | |
+| 협업도구 | |
+| DB | ![mysql](https://github.com/user-attachments/assets/41030949-7acc-4a1a-bf3a-0e343377b6c1) ![aws](https://github.com/user-attachments/assets/5606aa21-01c6-4089-b247-6e2a7d9bfb66)| 
 | 하드웨어 | |  
 
 ## 2 System Design
