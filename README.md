@@ -22,6 +22,19 @@
 | 공도웅 | 음성인식 기능제작, 음성인식을 위한 자료수집과 프로그램제작, 신호등 인식을위한 데이터 수집과 학습| 
 <br />
 
+### 프로젝트 선정 이유
+| 대중성 : 매년 증가하는 무인 자동차의 이용자 |
+|:---|
+| ![image](https://github.com/user-attachments/assets/9109cd6c-04f1-4ae5-8139-00dbbbfe6bf4) |
+
+| 안정성 : 고령화로 인해 늘어가는 고령 택시 운전자 |
+|:---|
+| ![image](https://github.com/user-attachments/assets/9c38cf3e-6bec-400a-b612-de1f1c5278ef) |
+
+| 조용함 : 택시기사가 말을 거는게 거북하거나 통화를 엿듣는게 걱정되는 사람들 |
+|:---|
+| ![image](https://github.com/user-attachments/assets/a097c235-b466-472b-b5bb-d134c66a40bd) |
+
 ## 🖥️ 활용 기술
 |구분|상세|
 |:---|:---|
@@ -36,14 +49,20 @@
 |협업| <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white" /> <img src="https://img.shields.io/badge/confluence-172B4D?style=for-the-badge&logo=confluence&logoColor=white" /> <img src="https://img.shields.io/badge/jira-0052CC?style=for-the-badge&logo=jira&logoColor=white" />|
 <br />
 
-## 데이터베이스
-![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
+## 기능 리스트
+![image](https://github.com/user-attachments/assets/c1bfe84e-1218-44ff-b512-a979fbbb9d21)
 
 ## 시스템 구성도
 ![image](https://github.com/user-attachments/assets/41ed0cdb-08df-44dd-9816-acadf4e6cc83)
 
-## 상태 다이어그램
+## UML
+### State Diagram
 ![image](https://github.com/user-attachments/assets/faca4d08-c369-48e4-b226-da6abb2d14cb)
+### Sequence Diagram
+![Untitled Diagram-1733471061903 drawio](https://github.com/user-attachments/assets/8f2e5f93-9c82-4179-851a-fe442bf0f31f)
+
+## DataBase
+![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
 
 ## GUI 설계
 
