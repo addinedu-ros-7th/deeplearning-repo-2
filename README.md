@@ -39,7 +39,17 @@
 ## 데이터베이스
 ![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
 
-## State Architectture
+## 시스템 구성도
+![image](https://github.com/user-attachments/assets/41ed0cdb-08df-44dd-9816-acadf4e6cc83)
 
+## 상태 다이어그램
+![image](https://github.com/user-attachments/assets/faca4d08-c369-48e4-b226-da6abb2d14cb)
+
+## GUI 설계
+
+## 객체 인식
+![image](https://github.com/user-attachments/assets/4620d91c-aaad-4b23-874f-21baeb0ab823)
+
+## 장애물 회피
 
 
