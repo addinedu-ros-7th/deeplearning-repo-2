@@ -78,7 +78,8 @@
 # Demostraction
 ## 객체 인식
 ![image](https://github.com/user-attachments/assets/4620d91c-aaad-4b23-874f-21baeb0ab823)
-![src_test1_1_1_1_1](https://github.com/user-attachments/assets/c238c3b6-e01c-44bb-bcf7-8b08545705b4)
+![src_test1_1_1_2_1](https://github.com/user-attachments/assets/6a0653f4-444f-452c-8642-23080e9f6526)
+
 
 
 
