@@ -51,5 +51,16 @@
 ![image](https://github.com/user-attachments/assets/4620d91c-aaad-4b23-874f-21baeb0ab823)
 
 ## 장애물 회피
+**• 정적 장애물**
 
+![1000005061_1](https://github.com/user-attachments/assets/1fd4c95e-7421-4dc7-aaba-76b9a7fe758a)
+
+**• 동적 장애물**
+
+![1000005073_1](https://github.com/user-attachments/assets/366feee2-a0d9-4d5b-b665-a30b77c15b5a)
+
+## 음성 인식
+
+## 동작 시나리오
+**1. 택시 호출**
 
