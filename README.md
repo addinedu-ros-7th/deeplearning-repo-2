@@ -35,3 +35,7 @@
 |라이브러리|<img src="https://img.shields.io/badge/NLTK-154F5B?style=for-the-badge&logo=python&logoColor=white" /> <img src="https://img.shields.io/badge/KONLPY-CD0000?style=for-the-badge&logo=python&logoColor=white" /> <img src="https://github.com/user-attachments/assets/fa2adf0e-2553-4cd6-84c8-c43b93028551" alt="image" width="101.750" height="28" />|
 |협업| <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white" /> <img src="https://img.shields.io/badge/confluence-172B4D?style=for-the-badge&logo=confluence&logoColor=white" /> <img src="https://img.shields.io/badge/jira-0052CC?style=for-the-badge&logo=jira&logoColor=white" />|
 <br />
+
+## 데이터베이스
+![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
+
