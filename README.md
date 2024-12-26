@@ -2,7 +2,7 @@
 딥러닝 프로젝트 2조 저장소. RoadMind
 ---
 > ### ***신호등 및 표지판 인식, 음성 인식 으로 안전하고 효율적인 자율주행의 기반을 구성하는 것***
-<br />
+<br/>
 
 ## 🤖 프로젝트 소개
 <details markdown="1">
@@ -11,7 +11,7 @@
 <li>RoadMind <b>신호등 및 표지판 인식, 음성 인식을 통해 안전하고 효율적인 자율주행의 기반을 구성</b>하고자 합니다.</li>
 <li>이 프로젝트에서는 자율주행을 위한 교통 상황 인식과 장애물 인식 기능을 개발하여, 차량이 실시간으로 환경을 이해하고 안전하게 주행할 수 있도록 지원합니다.</li>
 </details>
-<br />
+<br/>
 
 ## 🧠 구성원 및 역할
 |이름|업무|
@@ -20,7 +20,9 @@
 | 김진재 | 발표자료 제작, 교통표지판 인식을 위한 데이터수집과 Labeling, UML(System&State Architecture)작성, 설계구체화 | 
 | 임시온 | WEB Design, WEB Server와 Database 설계 및 제작과 연동, WEB에 음성인식 기능 이식, 다양한 지도 API로 성능개선| 
 | 공도웅 | 음성인식 기능제작, 음성인식을 위한 자료수집과 프로그램제작, 신호등 인식을위한 데이터 수집과 학습| 
-<br />
+<br/>
+
+<hr/>
 
 ### 프로젝트 선정 이유
 | 대중성 : 매년 증가하는 무인 자동차의 이용자 |
@@ -34,6 +36,8 @@
 | 조용함 : 택시기사가 말을 거는게 거북하거나 통화를 엿듣는게 걱정되는 사람들 |
 |:---|
 | ![image](https://github.com/user-attachments/assets/a097c235-b466-472b-b5bb-d134c66a40bd) |
+<hr/>
+<br/>
 
 ## 🖥️ 활용 기술
 |구분|상세|
@@ -55,16 +59,21 @@
 ## 시스템 구성도
 ![image](https://github.com/user-attachments/assets/41ed0cdb-08df-44dd-9816-acadf4e6cc83)
 
+<hr/>
+
 ## UML
 ### State Diagram
 ![image](https://github.com/user-attachments/assets/faca4d08-c369-48e4-b226-da6abb2d14cb)
 ### Sequence Diagram
 ![Untitled Diagram-1733471061903 drawio](https://github.com/user-attachments/assets/8f2e5f93-9c82-4179-851a-fe442bf0f31f)
+<hr/>
 
 ## DataBase
 ![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
 
 ## GUI 설계
+<br/>
+<hr/>
 
 # Demostraction
 ## 객체 인식
@@ -83,4 +92,4 @@
 
 ## 동작 시나리오
 **1. 택시 호출**
-
+<hr/>
