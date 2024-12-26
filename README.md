@@ -39,3 +39,7 @@
 ## 데이터베이스
 ![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
 
+## State Architectture
+
+
+
