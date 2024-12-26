@@ -93,6 +93,9 @@
 ## 동작 시나리오
 **1. 택시 호출**
 
+![final_1_1_1_1_1_1](https://github.com/user-attachments/assets/37d54e79-45dc-4d3f-9ba8-09395804ffa7)
+
+
 **2. 택시 주행**
 
 **• Inside of Driving**
@@ -105,4 +108,6 @@
 
 
 **3. 택시 하차**
+
+![final_1_2_1_1_1](https://github.com/user-attachments/assets/7e3f34c8-8f28-4007-8f25-57007a15fe21)
 
