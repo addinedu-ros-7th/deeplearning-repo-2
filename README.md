@@ -42,7 +42,7 @@
 ## 🖥️ 활용 기술
 |구분|상세|
 |:---|:---|
-|개발환경|<img src="https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white" /> |
+|개발환경|<img src="https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white" /> <img src="https://img.shields.io/badge/Armbian-333399?style=for-the-badge&logo=armbian&logoColor=white" />|
 |IDE| <img src="https://img.shields.io/badge/VSCode-0078D4?style=for-the-badge&logo=visual%20studio%20code&logoColor=white" /> <img src="https://img.shields.io/badge/Jupyter-F37626.svg?&style=for-the-badge&logo=Jupyter&logoColor=white" /> 
 |언어| <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" />   |
 |시각화 및 데이터 수집|<img src="https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white" /> <img src="https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white" /> <img src="https://img.shields.io/badge/Matplotlib-%23ffffff.svg?style=for-the-badge&logo=Matplotlib&logoColor=black" /> <img src="https://img.shields.io/badge/OPENAPI-%6BA539.svg?style=for-the-badge&logo=openapiinitiative&logoColor=black" /> <img src="https://img.shields.io/badge/roboflow-6706CE.svg?style=for-the-badge&logo=roboflow&logoColor=black" />|
