@@ -68,7 +68,7 @@
 ![Untitled Diagram-1733471061903 drawio](https://github.com/user-attachments/assets/8f2e5f93-9c82-4179-851a-fe442bf0f31f)
 <hr/>
 
-## DataBase
+## Database
 ![image](https://github.com/user-attachments/assets/ee72ddc1-24e7-4e44-8250-2fcc45b54e19)
 
 ## GUI 설계
@@ -77,7 +77,12 @@
 
 # Demostraction
 ## 객체 인식
-![image](https://github.com/user-attachments/assets/4620d91c-aaad-4b23-874f-21baeb0ab823)
+**• Daytime**
+
+![road_video_1](https://github.com/user-attachments/assets/7f838eff-cd00-4cc2-a6a9-f4b7588a2bb1)
+
+**• Night**
+
 ![src_test1_1_1_2_1](https://github.com/user-attachments/assets/6a0653f4-444f-452c-8642-23080e9f6526)
 
 
@@ -102,11 +107,11 @@
 
 **2. 택시 주행**
 
-**• Inside of Driving**
+**• Inside of Car**
 
 ![final_2](https://github.com/user-attachments/assets/89ce6543-2b84-4864-a7d2-5d3b4610d48f)
 
-**• Outside of Driving**
+**• Outside of Car**
 
 ![20241226_162147](https://github.com/user-attachments/assets/3aa1d6fd-171f-48c8-bcbb-800c3a23b502)
 
